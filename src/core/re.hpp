@@ -183,6 +183,7 @@ std::unique_ptr<Re> parse_without_pipe(std::string_view sv) {
   std::string_view original_sv = sv;
   while (!sv.empty()) {
     switch (sv[0]) {
+      // FIXME escaped for '\'
       case '+': {
         if (stack.size() == 0) {
           dbg(original_sv, sv);
