@@ -1,0 +1,25 @@
+cmake_minimum_required(VERSION 3.12)
+set(project_name re2dfa)
+project(${project_name} CXX)
+set(CMAKE_CXX_STANDARD 17)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -Wall -Wno-missing-braces")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address")
+if (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -static-libasan")
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -static-libsan")
+    endif()
+endif()
+
+include_directories(thirdparty)
+file(GLOB_RECURSE source_files "src/core/*.hpp" "src/core/*.cpp")
+
+add_executable(show_dfa src/show_dfa.cpp ${source_files})
+
+find_package(GTest)
+if(${GTEST_FOUND})
+    enable_testing()
+    add_subdirectory(test)
+endif()
