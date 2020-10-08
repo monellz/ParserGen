@@ -16,7 +16,7 @@ endif()
 include_directories(thirdparty)
 file(GLOB_RECURSE source_files "src/core/*.hpp" "src/core/*.cpp")
 
-add_executable(show_dfa src/show_dfa.cpp ${source_files})
+add_executable(dot_gen src/dot_gen.cpp ${source_files})
 
 find_package(GTest)
 if(${GTEST_FOUND})

@@ -33,7 +33,6 @@ TEST(basic, metachar) {
   EXPECT_NO_THROW({ auto res = parse(R"(\w)"); });
   EXPECT_NO_THROW({ auto res = parse(R"(\s)"); });
   EXPECT_NO_THROW({ auto res = parse(R"(\n)"); });
-  EXPECT_NO_THROW({ auto res = parse(R"(\b)"); });
   EXPECT_NO_THROW({ auto res = parse(R"(a|b)"); });
   EXPECT_NO_THROW({ auto res = parse(R"(\[\])"); });
 }

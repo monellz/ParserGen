@@ -34,6 +34,58 @@ struct Disjunction {
 
 
 
+void parse_escaped_matachar(std::string_view sv, std::function<void(char)> update) {
+  assert(sv[0] == '\\');
+  assert(sv.size() == 2);
+  switch (sv[1]) {
+    case '\\':
+    case '(':
+    case ')':
+    case '[':
+    case ']':
+    case '.':
+    case '|':
+    case '*':
+    case '+':
+    case '?':
+    case '{':
+    case '}':
+    case '^':
+    case '$': {
+      // escape
+      update(sv[1]);
+      break;
+    }
+    case 'n': {
+      update('\n');
+      break;
+    }
+    case 't': {
+      update('\t');
+      break;
+    }
+    case 's': {
+      update('\n');
+      update('\t');
+      update('\r');
+      break;
+    }
+    case 'w': {
+      //[A-Za-z0-9_]
+      for (char c = 'A'; c <= 'Z'; ++c) update(c);
+      for (char c = 'a'; c <= 'z'; ++c) update(c);
+      for (char c = '0'; c <= '9'; ++c) update(c);
+      update('_');
+      break;
+    }
+    default: {
+      dbg(sv);
+      throw err::ReErr(sv, "unsupported char for escaping: " + std::string(sv.substr(0, 2)));
+      break;
+    }
+  }
+}
+
 std::unique_ptr<Re> parse_brackets(std::string_view sv) {
   std::string_view original_sv = sv;
 
@@ -77,65 +129,19 @@ std::unique_ptr<Re> parse_brackets(std::string_view sv) {
   // parse normal char
   for (auto s: output) {
     while (!s.empty()) {
-      switch (s[0]) {
-        case '\\': {
-          // meta char
-          if (s.size() == 1) {
-            dbg(original_sv);
-            throw err::ReErr(original_sv, "escaped char is not complete");
-            s.remove_prefix(1);
-            break;
-          }
-          switch (s[1]) {
-            case '\\':
-            case '(':
-            case ')':
-            case '[':
-            case ']':
-            case '.':
-            case '|':
-            case '*':
-            case '+':
-            case '?':
-            case '{':
-            case '}':
-            case '^':
-            case '$': {
-              // escape
-              update(sv[1]);
-              break;
-            }
-            case 'n': {
-              update('\n');
-              break;
-            }
-            case 't': {
-              update('\t');
-              break;
-            }
-            case 's': {
-              update('\n');
-              update('\t');
-              update('\r');
-              break;
-            }
-            case 'w': {
-              //[A-Za-z0-9_]
-              for (char c = 'A'; c <= 'Z'; ++c) update(c);
-              for (char c = 'a'; c <= 'z'; ++c) update(c);
-              for (char c = '0'; c <= '9'; ++c) update(c);
-              update('_');
-              break;
-            }
-            default: {
-              dbg(original_sv);
-              throw err::ReErr(original_sv, "unsupported char for escaping: " + std::string(s.substr(0, 2)));
-              break;
-            }
-          }
+      if (s[0] == '\\') {
+        // escaped metachar
+        if (s.size() == 1) {
+          dbg(original_sv);
+          throw err::ReErr(original_sv, "escaped char is not complete");
+          s.remove_prefix(1);
+        } else {
+          parse_escaped_matachar(s.substr(0, 2), update);
           s.remove_prefix(2);
-          break;
         }
+        continue;
+      }
+      switch (s[0]) {
         case '(':
         case ')':
         case '[':
@@ -152,6 +158,10 @@ std::unique_ptr<Re> parse_brackets(std::string_view sv) {
           throw err::ReErr(original_sv, "not support unescaped metachar in brackets");
           s.remove_prefix(1);
           break;
+        }
+        case '\\': {
+          // meta char
+          UNREACHABLE();
         }
         default: {
           // normal char
@@ -181,9 +191,25 @@ std::unique_ptr<Re> parse_without_pipe(std::string_view sv) {
   // stack elem use Concat
   std::vector<std::unique_ptr<Re>> stack;
   std::string_view original_sv = sv;
+
+  std::function<void(char)> update = [&](char c) {
+    auto k = std::make_unique<Re>(c);
+    stack.push_back(std::move(k));
+  };
+
   while (!sv.empty()) {
+    if (sv[0] == '\\') {
+      if (sv.size() == 1) {
+        dbg(original_sv);
+          throw err::ReErr(original_sv, "escaped char is not complete");
+          sv.remove_prefix(1);
+      } else {
+          parse_escaped_matachar(sv.substr(0, 2), update);
+          sv.remove_prefix(2);
+      }
+      continue;
+    }
     switch (sv[0]) {
-      // FIXME escaped for '\'
       case '+': {
         if (stack.size() == 0) {
           dbg(original_sv, sv);
@@ -283,6 +309,7 @@ std::unique_ptr<Re> parse_without_pipe(std::string_view sv) {
         sv.remove_prefix(1);
         break;
       }
+      case '\\':
       case '|': {
         UNREACHABLE();
       }
