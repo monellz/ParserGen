@@ -10,6 +10,13 @@ using namespace parsergen::err;
 
 #define EXPECT_RE_TYPE(x, type) EXPECT_TRUE(std::holds_alternative<type>(x)) << "type is " << (x).index()
 
+TEST(shared, equal) {
+  auto re1 = std::make_shared<Re>(char('a'));
+  auto re2 = re1;
+  EXPECT_EQ(re1.use_count(), 2);
+  EXPECT_EQ(re1, re2);
+}
+
 TEST(basic, single_word_char) {
   std::unordered_set<std::string> words;
   for (char c = 'a'; c != 'z'; ++c) words.insert(std::string(1, c));
@@ -17,7 +24,7 @@ TEST(basic, single_word_char) {
   for (char c = '0'; c != '9'; ++c) words.insert(std::string(1, c));
 
   for (auto c: words) {
-    std::unique_ptr<Re> res;
+    std::shared_ptr<Re> res;
     EXPECT_NO_THROW({
       res = parse(c);
     });

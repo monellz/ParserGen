@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <unordered_set>
+#include <unordered_map>
 
 #include "common.hpp"
 
@@ -12,26 +13,61 @@ namespace parsergen::re {
 
 struct Eps {};
 struct Kleene;
-struct Plus;
+
+// if I use Plus struct to simplify the parse logic
+//  then there is an inevitable err for generating followpos for Plus Node
+// so I need to implement CLONE for Re type (Rust is MUCH better than C++)
+//struct Plus;
 struct Concat;
 struct Disjunction;
-using Re = std::variant<Eps, char, Kleene, Plus, Concat, Disjunction>;
+using Re = std::variant<Eps, char, Kleene, Concat, Disjunction>;
 
+// Why shared_ptr not shared_ptr?
+// : Re will be used to create map and shared_ptr may be improper as a key
 struct Kleene {
-  std::unique_ptr<Re> inner;
+  //std::shared_ptr<Re> inner;
+  std::shared_ptr<Re> inner;
 };
 
+/*
 struct Plus {
-  std::unique_ptr<Re> inner;
+  std::shared_ptr<Re> inner;
 };
+*/
 
 struct Concat {
-  std::vector<std::unique_ptr<Re>> inners;
+  std::vector<std::shared_ptr<Re>> inners;
 };
 struct Disjunction {
-  std::vector<std::unique_ptr<Re>> inners;
+  std::vector<std::shared_ptr<Re>> inners;
 };
 
+std::shared_ptr<Re> clone(const std::shared_ptr<Re>& cur) {
+  std::shared_ptr<Re> res;
+  std::visit(overloaded {
+    [&] (char c) { res.reset(new Re(c)); },
+    [&] (const Eps& e) { res.reset(new Re(Eps())); },
+    [&] (const Kleene& k) {
+      res.reset(new Re(Kleene()));
+      std::get<Kleene>(*res).inner = clone(k.inner);
+    },
+    [&] (const Concat& c) {
+      res.reset(new Re(Concat()));
+      auto& inners = std::get<Concat>(*res).inners;
+      for (auto& son: c.inners) {
+        inners.push_back(clone(son));
+      }
+    },
+    [&] (const Disjunction& d) {
+      res.reset(new Re(Disjunction()));
+      auto& inners = std::get<Disjunction>(*res).inners;
+      for (auto& son: d.inners) {
+        inners.push_back(clone(son));
+      }
+    }
+  }, *cur);
+  return res;
+}
 
 
 void parse_escaped_matachar(std::string_view sv, std::function<void(char)> update) {
@@ -68,6 +104,7 @@ void parse_escaped_matachar(std::string_view sv, std::function<void(char)> updat
       update('\n');
       update('\t');
       update('\r');
+      update(' ');
       break;
     }
     case 'w': {
@@ -86,7 +123,7 @@ void parse_escaped_matachar(std::string_view sv, std::function<void(char)> updat
   }
 }
 
-std::unique_ptr<Re> parse_brackets(std::string_view sv) {
+std::shared_ptr<Re> parse_brackets(std::string_view sv) {
   std::string_view original_sv = sv;
 
   std::unordered_set<char> hs;
@@ -176,24 +213,24 @@ std::unique_ptr<Re> parse_brackets(std::string_view sv) {
   auto res = new Re(Disjunction());
   auto& inners = std::get<Disjunction>(*res).inners;
   for (auto c: hs) {
-    auto re = std::make_unique<Re>(Re(char(c)));
+    auto re = std::make_shared<Re>(Re(char(c)));
     inners.push_back(std::move(re));
   }
 
-  return std::unique_ptr<Re>(res);
+  return std::shared_ptr<Re>(res);
 }
 
 
-std::unique_ptr<Re> parse_without_pipe(std::string_view sv) {
+std::shared_ptr<Re> parse_without_pipe(std::string_view sv) {
   // meta char
   // ()[].|*+\?  not support {} ^ $
 
   // stack elem use Concat
-  std::vector<std::unique_ptr<Re>> stack;
+  std::vector<std::shared_ptr<Re>> stack;
   std::string_view original_sv = sv;
 
   std::function<void(char)> update = [&](char c) {
-    auto k = std::make_unique<Re>(c);
+    auto k = std::make_shared<Re>(c);
     stack.push_back(std::move(k));
   };
 
@@ -217,12 +254,12 @@ std::unique_ptr<Re> parse_without_pipe(std::string_view sv) {
           sv.remove_prefix(1);
           break;
         }
-        auto k = new Re(Plus());
-        std::get<Plus>(*k).inner = std::move(stack.back());
-        stack.back().reset(k);
+        auto k_son = clone(stack.back());
+        auto k = std::make_shared<Re>(Kleene());
+        std::get<Kleene>(*k).inner = std::move(k_son);
+        stack.push_back(std::move(k));
         sv.remove_prefix(1);
         break;
-
       }
       case '*': {
         if (stack.size() == 0) {
@@ -242,15 +279,15 @@ std::unique_ptr<Re> parse_without_pipe(std::string_view sv) {
         auto& inners = std::get<Disjunction>(*re).inners;
         inners.resize(2);
         inners.emplace_back(std::move(stack.back()));
-        inners.emplace_back(std::make_unique<Re>(Eps()));
+        inners.emplace_back(std::make_shared<Re>(Eps()));
         stack.back().reset(re);
         sv.remove_prefix(1);
         break;
       }
       case '.': {
-        auto re = std::make_unique<Re>(Disjunction());
+        auto re = std::make_shared<Re>(Disjunction());
         auto& inners = std::get<Disjunction>(*re).inners;
-        for (int i = 0; i < 256; ++i) inners.push_back(std::make_unique<Re>(char(i)));
+        for (int i = 0; i < 256; ++i) inners.push_back(std::make_shared<Re>(char(i)));
         sv.remove_prefix(1);
         break;
       }
@@ -314,7 +351,7 @@ std::unique_ptr<Re> parse_without_pipe(std::string_view sv) {
         UNREACHABLE();
       }
       default: {
-        auto re = std::make_unique<Re>(char(sv[0]));
+        auto re = std::make_shared<Re>(char(sv[0]));
         stack.push_back(std::move(re));
         sv.remove_prefix(1);
         break;
@@ -328,11 +365,11 @@ std::unique_ptr<Re> parse_without_pipe(std::string_view sv) {
     inners.push_back(std::move(re));
   }
 
-  return std::unique_ptr<Re>(res);
+  return std::shared_ptr<Re>(res);
 }
 
 
-std::unique_ptr<Re> parse(std::string_view sv) {
+std::shared_ptr<Re> parse(std::string_view sv) {
   std::vector<std::string_view> output = split(sv, "|");
   if (output.size() == 1) {
     return parse_without_pipe(output[0]);
@@ -346,8 +383,10 @@ std::unique_ptr<Re> parse(std::string_view sv) {
     auto one = parse_without_pipe(s);
     inners.emplace_back(std::move(one));
   }
-  return std::unique_ptr<Re>(res);
+  return std::shared_ptr<Re>(res);
 }
 
 
-};  // namespace re2dfa::re
+
+
+};  // namespace parsergen::re
