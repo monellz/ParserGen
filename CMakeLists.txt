@@ -52,6 +52,8 @@ if(NOT ${GTEST_FOUND})
         include_directories("${gtest_SOURCE_DIR}/include")
     endif()
 
+    set(GTEST_INCLUDE_DIR "${gtest_SOURCE_DIR}/include")
+
 endif()
 
 enable_testing()
