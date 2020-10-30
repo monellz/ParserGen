@@ -1,5 +1,7 @@
 # ParserGen
 
+[![Actions Status](https://github.com/monellz/ParserGen/workflows/build-and-test/badge.svg)](https://github.com/monellz/ParserGen/actions)
+
 Parser Generator
 
 ## Feature
