@@ -1,8 +1,9 @@
 #pragma once
 
 #include <vector>
-#include "re.hpp"
+
 #include "common.hpp"
+#include "re.hpp"
 
 namespace parsergen::dfa {
 
@@ -10,15 +11,15 @@ using DfaNode = std::unordered_map<u8, u32>;
 
 struct Dfa {
   std::vector<std::tuple<DfaNode, bool>> nodes;
-  Dfa(){}
-  Dfa(const Dfa& d): nodes(d.nodes) {}
-  Dfa(Dfa&& d): nodes(std::move(d.nodes)) {}
+  Dfa() {}
+  Dfa(const Dfa& d) : nodes(d.nodes) {}
+  Dfa(Dfa&& d) : nodes(std::move(d.nodes)) {}
 
   bool accept(std::string_view sv) {
     assert(nodes.size() >= 1);
     u32 cur_idx = 0;
     bool cur_terminal = std::get<1>(nodes[0]);
-    for (auto c: sv) {
+    for (auto c : sv) {
       const auto& [cur_node, _] = nodes[cur_idx];
       if (auto it = cur_node.find(c); it != cur_node.end()) {
         // found corresponding edge
@@ -47,7 +48,7 @@ struct Dfa {
       stack.pop_back();
       reindex[cur] = alive_num++;
       const auto& [node, _] = nodes[cur];
-      for (const auto& [__, next]: node) {
+      for (const auto& [__, next] : node) {
         if (!visit[next]) {
           visit[next] = true;
           stack.push_back(next);
@@ -74,7 +75,7 @@ struct Dfa {
 };
 
 class DfaEngine {
-private:
+ private:
   std::unique_ptr<re::Re> expand_re;
 
   std::vector<std::unordered_set<int>> states;
@@ -86,8 +87,9 @@ private:
   int TERMINATION_INDEX;
 
   std::unordered_map<int, std::unordered_set<int>> followpos;
-public:
-  DfaEngine(std::unique_ptr<re::Re> _re, int _leaf_count): leaf_count(_leaf_count) {
+
+ public:
+  DfaEngine(std::unique_ptr<re::Re> _re, int _leaf_count) : leaf_count(_leaf_count) {
     auto ex_re = new re::Concat();
     ex_re->sons.push_back(_re.release());
     ex_re->sons.push_back(new re::Char('\0', leaf_count++));
@@ -118,11 +120,11 @@ public:
       dfa.nodes.push_back(std::make_tuple(DfaNode(), is_terminal));
       auto& [cur, _] = dfa.nodes[label_idx];
       std::unordered_map<u8, std::unordered_set<int>> u;
-      for (auto pos: s) u[leafpos_map.at(pos)].insert(pos);
-      for (auto& [c, pos_set]: u) {
+      for (auto pos : s) u[leafpos_map.at(pos)].insert(pos);
+      for (auto& [c, pos_set] : u) {
         std::unordered_set<int> new_set;
         // followpos use [] instead of AT, because default followpos is empty set
-        for (auto pos: pos_set) union_inplace(new_set, followpos[pos]);
+        for (auto pos : pos_set) union_inplace(new_set, followpos[pos]);
         auto next_state_idx = get_state_idx(new_set);
         cur[c] = next_state_idx;
       }
@@ -130,7 +132,7 @@ public:
     }
 
     // clean TERMINATION
-    for (auto& [node, _]: dfa.nodes) {
+    for (auto& [node, _] : dfa.nodes) {
       node.erase(TERMINATION);
     }
 
@@ -145,5 +147,5 @@ public:
     return std::make_tuple(std::move(engine), std::move(dfa));
   }
 };
-  
-} // namespace parsergen::dfa
+
+}  // namespace parsergen::dfa

@@ -2,9 +2,9 @@
 
 #include <memory>
 #include <string_view>
-#include <vector>
-#include <unordered_set>
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 #include "common.hpp"
 
@@ -15,12 +15,13 @@ struct Re {
   std::unordered_set<int> firstpos;
   std::unordered_set<int> lastpos;
 
-  virtual void traverse(std::unordered_map<int, u8>& leafpos_map, std::unordered_map<int, std::unordered_set<int>>& followpos) = 0;
+  virtual void traverse(std::unordered_map<int, u8>& leafpos_map,
+                        std::unordered_map<int, std::unordered_set<int>>& followpos) = 0;
   virtual Re* clone() = 0;
-  virtual ~Re() {};
+  virtual ~Re(){};
 };
 
-struct Eps: Re {
+struct Eps : Re {
   Eps() {
     nullable = true;
     firstpos = {};
@@ -35,15 +36,13 @@ struct Eps: Re {
     */
   }
 
-  Re* clone() {
-    return new Eps();
-  }
+  Re* clone() { return new Eps(); }
 };
 
-struct Char: Re {
+struct Char : Re {
   char c;
   int leaf_count;
-  Char(char _c, int _leaf_count): c(_c), leaf_count(_leaf_count) {
+  Char(char _c, int _leaf_count) : c(_c), leaf_count(_leaf_count) {
     nullable = false;
     firstpos = {leaf_count};
     lastpos = {leaf_count};
@@ -56,43 +55,41 @@ struct Char: Re {
     lastpos = {leaf_count};
     */
 
-   leafpos_map[leaf_count] = c;
+    leafpos_map[leaf_count] = c;
   }
-  Re* clone() {
-    return new Char(c, leaf_count);
-  }
+  Re* clone() { return new Char(c, leaf_count); }
 };
 
-struct Kleene: Re {
+struct Kleene : Re {
   Re* son;
-  Kleene(Re* _son): son(_son) {}
+  Kleene(Re* _son) : son(_son) {}
   void traverse(std::unordered_map<int, u8>& leafpos_map, std::unordered_map<int, std::unordered_set<int>>& followpos) {
     son->traverse(leafpos_map, followpos);
     nullable = true;
     firstpos = son->firstpos;
     lastpos = son->lastpos;
 
-    for (auto pos: lastpos) {
+    for (auto pos : lastpos) {
       union_inplace(followpos[pos], firstpos);
     }
   }
-  Re* clone() {
-    return new Kleene(son->clone());
+  Re* clone() { return new Kleene(son->clone()); }
+  ~Kleene() {
+    if (son) delete son;
   }
-  ~Kleene() { if (son) delete son; }
 };
 
-struct Concat: Re {
+struct Concat : Re {
   std::vector<Re*> sons;
   Re* clone() {
     auto res = new Concat();
-    for (auto son: sons) {
+    for (auto son : sons) {
       res->sons.push_back(son->clone());
     }
     return res;
   }
   ~Concat() {
-    for (auto son: sons) {
+    for (auto son : sons) {
       if (son) delete son;
     }
     sons.clear();
@@ -100,7 +97,7 @@ struct Concat: Re {
   void traverse(std::unordered_map<int, u8>& leafpos_map, std::unordered_map<int, std::unordered_set<int>>& followpos) {
     nullable = true;
     bool stop = false;
-    for (auto son: sons) {
+    for (auto son : sons) {
       son->traverse(leafpos_map, followpos);
       nullable = nullable && son->nullable;
       if (!stop) {
@@ -120,34 +117,35 @@ struct Concat: Re {
     // followpos
     std::unordered_set<int> tmp_lastpos;
     for (int i = 0; i < sons.size() - 1; ++i) {
-      if (sons[i]->nullable) union_inplace(tmp_lastpos, sons[i]->lastpos);
-      else tmp_lastpos = sons[i]->lastpos;
-      for (auto pos: tmp_lastpos) {
+      if (sons[i]->nullable)
+        union_inplace(tmp_lastpos, sons[i]->lastpos);
+      else
+        tmp_lastpos = sons[i]->lastpos;
+      for (auto pos : tmp_lastpos) {
         union_inplace(followpos[pos], sons[i + 1]->firstpos);
       }
     }
   }
-
 };
 
-struct Disjunction: Re {
+struct Disjunction : Re {
   std::vector<Re*> sons;
   Re* clone() {
     auto res = new Disjunction();
-    for (auto son: sons) {
+    for (auto son : sons) {
       res->sons.push_back(son->clone());
     }
     return res;
   }
   ~Disjunction() {
-    for (auto son: sons) {
+    for (auto son : sons) {
       if (son) delete son;
     }
     sons.clear();
   }
   void traverse(std::unordered_map<int, u8>& leafpos_map, std::unordered_map<int, std::unordered_set<int>>& followpos) {
     nullable = false;
-    for (auto son: sons) {
+    for (auto son : sons) {
       son->traverse(leafpos_map, followpos);
       nullable = nullable || son->nullable;
       union_inplace(firstpos, son->firstpos);
@@ -157,10 +155,11 @@ struct Disjunction: Re {
 };
 
 class ReEngine {
-private:
+ private:
   void _parse_escaped_metachar(std::string_view sv, std::function<void(char)> update);
-public:
-  ReEngine(): leaf_count(0) {}
+
+ public:
+  ReEngine() : leaf_count(0) {}
   int leaf_count;
   static std::tuple<std::unique_ptr<Re>, int> produce(std::string_view sv) {
     ReEngine engine;
@@ -170,8 +169,6 @@ public:
   std::unique_ptr<Re> parse_without_pipe(std::string_view sv);
   std::unique_ptr<Re> parse_brackets(std::string_view sv);
 };
-
-
 
 void ReEngine::_parse_escaped_metachar(std::string_view sv, std::function<void(char)> update) {
   assert(sv[0] == '\\');
@@ -247,14 +244,12 @@ std::unique_ptr<Re> ReEngine::parse_brackets(std::string_view sv) {
         ERR_EXIT(original_sv, "escape char is not complete");
       }
       std::unordered_set<char> tmp_hs;
-      std::function<void(char)> tmp_update = [&](char c) {
-        tmp_hs.insert(c);
-      };
+      std::function<void(char)> tmp_update = [&](char c) { tmp_hs.insert(c); };
       _parse_escaped_metachar(sv.substr(0, 2), tmp_update);
       if (tmp_hs.size() > 1) {
         // use disjunction
         auto d = new Disjunction();
-        for (auto c: tmp_hs) d->sons.push_back(new Char(c, -1));
+        for (auto c : tmp_hs) d->sons.push_back(new Char(c, -1));
         tmp_dis->sons.push_back(d);
       } else {
         assert(tmp_hs.size() == 1);
@@ -299,7 +294,7 @@ std::unique_ptr<Re> ReEngine::parse_brackets(std::string_view sv) {
   }
 
   // check minus ilegal
-  for (auto idx: minus_idx) {
+  for (auto idx : minus_idx) {
     // check [idx - 1] and [idx] exsistence
     if (idx < 1 || idx >= tmp_dis->sons.size()) {
       update('-');
@@ -333,10 +328,10 @@ std::unique_ptr<Re> ReEngine::parse_brackets(std::string_view sv) {
     tmp_dis->sons[idx] = nullptr;
   }
 
-  for (auto& son: tmp_dis->sons) {
+  for (auto& son : tmp_dis->sons) {
     if (son == nullptr) continue;
     if (auto dis = dynamic_cast<Disjunction*>(son)) {
-      for (auto s: dis->sons) {
+      for (auto s : dis->sons) {
         assert(dynamic_cast<Char*>(s) != nullptr);
         update(dynamic_cast<Char*>(s)->c);
       }
@@ -349,9 +344,8 @@ std::unique_ptr<Re> ReEngine::parse_brackets(std::string_view sv) {
   // delete(and his sons)
   tmp_dis.reset();
 
-
   auto dis = std::make_unique<Disjunction>();
-  for (auto c: hs) {
+  for (auto c : hs) {
     dis->sons.push_back(new Char(c, leaf_count++));
   }
 
@@ -367,9 +361,7 @@ std::unique_ptr<Re> ReEngine::parse_without_pipe(std::string_view sv) {
   auto& stack = concat->sons;
   std::string_view original_sv = sv;
 
-  std::function<void(char)> update = [&](char c) {
-    stack.push_back(new Char(c, leaf_count++));
-  };
+  std::function<void(char)> update = [&](char c) { stack.push_back(new Char(c, leaf_count++)); };
 
   while (!sv.empty()) {
     if (sv[0] == '\\') {
@@ -381,10 +373,10 @@ std::unique_ptr<Re> ReEngine::parse_without_pipe(std::string_view sv) {
       continue;
     }
 
-    #define CHECK_STACK_FOR_UNARY_OP(err_msg) \
-      do { \
-        if (stack.size() == 0) ERR_EXIT(original_sv, err_msg);  \
-      } while (false)
+#define CHECK_STACK_FOR_UNARY_OP(err_msg)                  \
+  do {                                                     \
+    if (stack.size() == 0) ERR_EXIT(original_sv, err_msg); \
+  } while (false)
 
     switch (sv[0]) {
       case '+': {
@@ -475,10 +467,10 @@ std::unique_ptr<Re> ReEngine::parse(std::string_view sv) {
   std::vector<std::string_view> output = split(sv, "|");
   if (output.size() == 1) return parse_without_pipe(output[0]);
 
-  //auto dis = new Disjunction();
+  // auto dis = new Disjunction();
   auto dis = std::make_unique<Disjunction>();
   dis->sons.reserve(output.size());
-  for (auto s: output) {
+  for (auto s : output) {
     assert(!s.empty());
     auto one = parse_without_pipe(s);
     dis->sons.emplace_back(one.release());
@@ -487,4 +479,4 @@ std::unique_ptr<Re> ReEngine::parse(std::string_view sv) {
   return dis;
 }
 
-} // namespace parsergen::re
+}  // namespace parsergen::re
