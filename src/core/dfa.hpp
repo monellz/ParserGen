@@ -19,7 +19,7 @@ struct Dfa {
     u32 cur_idx = 0;
     bool cur_terminal = std::get<1>(nodes[0]);
     for (auto c: sv) {
-      auto& [cur_node, _] = nodes[cur_idx];
+      const auto& [cur_node, _] = nodes[cur_idx];
       if (auto it = cur_node.find(c); it != cur_node.end()) {
         // found corresponding edge
         cur_idx = it->second;
@@ -30,12 +30,52 @@ struct Dfa {
     }
     return cur_terminal;
   }
+
+  void minimize() {
+    // now only remove dead state
+    // TODO: more efficient
+    std::vector<bool> visit(nodes.size(), false);
+    std::vector<int> stack;
+    stack.reserve(nodes.size());
+
+    stack.push_back(0);
+    visit[0] = true;
+    int alive_num = 0;
+    std::unordered_map<int, int> reindex;
+    while (!stack.empty()) {
+      int cur = stack.back();
+      stack.pop_back();
+      reindex[cur] = alive_num++;
+      const auto& [node, _] = nodes[cur];
+      for (const auto& [__, next]: node) {
+        if (!visit[next]) {
+          visit[next] = true;
+          stack.push_back(next);
+        }
+      }
+    }
+
+    std::vector<std::tuple<DfaNode, bool>> new_nodes(alive_num);
+
+    for (int i = 0; i < visit.size(); ++i) {
+      if (visit[i]) {
+        // alive node
+
+        new_nodes[reindex.at(i)] = std::move(nodes[i]);
+        auto& [node, _] = new_nodes[reindex.at(i)];
+        for (auto it = node.begin(); it != node.end(); ++it) {
+          it->second = reindex.at(it->second);
+        }
+      }
+    }
+
+    nodes = std::move(new_nodes);
+  }
 };
 
 class DfaEngine {
 private:
-  std::shared_ptr<re::Re> re;
-  std::shared_ptr<re::Re> expand_re;
+  std::unique_ptr<re::Re> expand_re;
 
   std::vector<std::unordered_set<int>> states;
 
@@ -45,85 +85,17 @@ private:
   const char TERMINATION = '\0';
   int TERMINATION_INDEX;
 
-  std::unordered_map<std::shared_ptr<re::Re>, bool> nullable;
-  std::unordered_map<std::shared_ptr<re::Re>, std::unordered_set<int>> firstpos;
-  std::unordered_map<std::shared_ptr<re::Re>, std::unordered_set<int>> lastpos;
   std::unordered_map<int, std::unordered_set<int>> followpos;
-  
-  void _traverse(const std::shared_ptr<re::Re>& cur) {
-    std::visit(overloaded {
-      [&] (const char c) {
-        nullable[cur] = false;
-        firstpos[cur] = {leaf_count};
-        lastpos[cur] = {leaf_count};
-
-        leafpos_map[leaf_count++] = c;
-      },
-      [&] (const re::Eps&) {
-        nullable[cur] = true;
-        firstpos[cur] = {};
-        lastpos[cur] = {};
-      },
-      [&] (const re::Kleene& k) {
-        auto son = k.inner;
-        _traverse(son);
-        
-        nullable[cur] = true;
-        firstpos[cur] = firstpos[son];
-        lastpos[cur] = lastpos[son];
-
-        for (auto pos: lastpos[cur]) {
-          union_inplace(followpos[pos], firstpos[cur]);
-        }
-      },
-      [&] (const re::Concat& c) {
-        nullable[cur] = true;
-        bool stop = false;
-        for (auto son: c.inners) {
-          _traverse(son);
-          nullable[cur] = nullable[cur] && nullable[son];
-          if (!stop) {
-            union_inplace(firstpos[cur], firstpos[son]);
-            if (!nullable[son]) stop = true;
-          }
-        }
-        stop = false;
-        for (auto it = c.inners.rbegin(); it != c.inners.rend(); it++) {
-          if (!stop) {
-            union_inplace(lastpos[cur], lastpos[*it]);
-            if (!nullable[*it]) stop = true;
-          }
-        }
-
-        // followpos
-        for (int i = 0; i < c.inners.size() - 1; i++) {
-          for (auto pos: lastpos[c.inners[i]]) {
-            union_inplace(followpos[pos], firstpos[c.inners[i + 1]]);
-          }
-        }
-      },
-      [&] (const re::Disjunction& d) {
-        nullable[cur] = false;
-        for (auto son: d.inners) {
-          _traverse(son);
-          nullable[cur] = nullable[cur] || nullable[son];
-          union_inplace(firstpos[cur], firstpos[son]);
-          union_inplace(lastpos[cur], lastpos[son]);
-        }
-      },
-    }, *cur);
-  }
 public:
-  DfaEngine(std::shared_ptr<re::Re>& _re): re(std::move(_re)), leaf_count(0), TERMINATION_INDEX(-1) {
-    // use \0 as the termination
-    expand_re = std::make_shared<re::Re>(re::Concat());
+  DfaEngine(std::unique_ptr<re::Re> _re, int _leaf_count): leaf_count(_leaf_count) {
+    auto ex_re = new re::Concat();
+    ex_re->sons.push_back(_re.release());
+    ex_re->sons.push_back(new re::Char('\0', leaf_count++));
+    ex_re->traverse(leafpos_map, followpos);
 
-    std::get<re::Concat>(*expand_re).inners.push_back(re); // !!! use INTERNAL member instead of args (it's MOVED!!!)
-    std::get<re::Concat>(*expand_re).inners.push_back(std::make_shared<re::Re>(char(TERMINATION)));
+    expand_re.reset(ex_re);
 
-    _traverse(expand_re);
-
-    TERMINATION_INDEX = leaf_count - 1; 
+    TERMINATION_INDEX = leaf_count - 1;
     assert(leafpos_map.at(TERMINATION_INDEX) == TERMINATION);
   }
 
@@ -132,7 +104,7 @@ public:
     Dfa dfa;
 
     int label_idx = 0;
-    states.push_back(firstpos[expand_re]);
+    states.push_back(expand_re->firstpos);
     auto get_state_idx = [this](std::unordered_set<int>& s) -> int {
       for (int i = 0; i < this->states.size(); ++i) {
         if (this->states[i] == s) return i;
@@ -157,14 +129,20 @@ public:
       label_idx++;
     }
 
+    // clean TERMINATION
+    for (auto& [node, _]: dfa.nodes) {
+      node.erase(TERMINATION);
+    }
+
     return dfa;
   }
 
   static std::tuple<DfaEngine, Dfa> produce(std::string_view sv) {
-    auto re = re::parse(sv);
-    DfaEngine engine(re);
+    auto [re, leaf_count] = re::ReEngine::produce(sv);
+    DfaEngine engine(std::move(re), leaf_count);
     auto dfa = engine.produce();
-    return std::make_tuple(engine, dfa);
+    dfa.minimize();
+    return std::make_tuple(std::move(engine), std::move(dfa));
   }
 };
   

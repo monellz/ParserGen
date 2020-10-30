@@ -3,7 +3,6 @@
 #include <memory>
 #include <string_view>
 #include <vector>
-#include <variant>
 #include <unordered_set>
 #include <unordered_map>
 
@@ -11,66 +10,170 @@
 
 namespace parsergen::re {
 
-struct Eps {};
-struct Kleene;
+struct Re {
+  bool nullable;
+  std::unordered_set<int> firstpos;
+  std::unordered_set<int> lastpos;
 
-// if I use Plus struct to simplify the parse logic
-//  then there is an inevitable err for generating followpos for Plus Node
-// so I need to implement CLONE for Re type (Rust is MUCH better than C++)
-//struct Plus;
-struct Concat;
-struct Disjunction;
-using Re = std::variant<Eps, char, Kleene, Concat, Disjunction>;
-
-// Why shared_ptr not shared_ptr?
-// : Re will be used to create map and shared_ptr may be improper as a key
-struct Kleene {
-  //std::shared_ptr<Re> inner;
-  std::shared_ptr<Re> inner;
+  virtual void traverse(std::unordered_map<int, u8>& leafpos_map, std::unordered_map<int, std::unordered_set<int>>& followpos) = 0;
+  virtual Re* clone() = 0;
+  virtual ~Re() {};
 };
 
-/*
-struct Plus {
-  std::shared_ptr<Re> inner;
-};
-*/
+struct Eps: Re {
+  Eps() {
+    nullable = true;
+    firstpos = {};
+    lastpos = {};
+  }
+  void traverse(std::unordered_map<int, u8>& leafpos_map, std::unordered_map<int, std::unordered_set<int>>& followpos) {
+    // done in initialization
+    /*
+    nullable = true;
+    firstpos = {};
+    lastpos = {};
+    */
+  }
 
-struct Concat {
-  std::vector<std::shared_ptr<Re>> inners;
-};
-struct Disjunction {
-  std::vector<std::shared_ptr<Re>> inners;
+  Re* clone() {
+    return new Eps();
+  }
 };
 
-std::shared_ptr<Re> clone(const std::shared_ptr<Re>& cur) {
-  std::shared_ptr<Re> res;
-  std::visit(overloaded {
-    [&] (char c) { res.reset(new Re(c)); },
-    [&] (const Eps& e) { res.reset(new Re(Eps())); },
-    [&] (const Kleene& k) {
-      res.reset(new Re(Kleene()));
-      std::get<Kleene>(*res).inner = clone(k.inner);
-    },
-    [&] (const Concat& c) {
-      res.reset(new Re(Concat()));
-      auto& inners = std::get<Concat>(*res).inners;
-      for (auto& son: c.inners) {
-        inners.push_back(clone(son));
-      }
-    },
-    [&] (const Disjunction& d) {
-      res.reset(new Re(Disjunction()));
-      auto& inners = std::get<Disjunction>(*res).inners;
-      for (auto& son: d.inners) {
-        inners.push_back(clone(son));
+struct Char: Re {
+  char c;
+  int leaf_count;
+  Char(char _c, int _leaf_count): c(_c), leaf_count(_leaf_count) {
+    nullable = false;
+    firstpos = {leaf_count};
+    lastpos = {leaf_count};
+  }
+  void traverse(std::unordered_map<int, u8>& leafpos_map, std::unordered_map<int, std::unordered_set<int>>& followpos) {
+    // partly done in initialization
+    /*
+    nullable = false;
+    firstpos = {leaf_count};
+    lastpos = {leaf_count};
+    */
+
+   leafpos_map[leaf_count] = c;
+  }
+  Re* clone() {
+    return new Char(c, leaf_count);
+  }
+};
+
+struct Kleene: Re {
+  Re* son;
+  Kleene(Re* _son): son(_son) {}
+  void traverse(std::unordered_map<int, u8>& leafpos_map, std::unordered_map<int, std::unordered_set<int>>& followpos) {
+    son->traverse(leafpos_map, followpos);
+    nullable = true;
+    firstpos = son->firstpos;
+    lastpos = son->lastpos;
+
+    for (auto pos: lastpos) {
+      union_inplace(followpos[pos], firstpos);
+    }
+  }
+  Re* clone() {
+    return new Kleene(son->clone());
+  }
+  ~Kleene() { if (son) delete son; }
+};
+
+struct Concat: Re {
+  std::vector<Re*> sons;
+  Re* clone() {
+    auto res = new Concat();
+    for (auto son: sons) {
+      res->sons.push_back(son->clone());
+    }
+    return res;
+  }
+  ~Concat() {
+    for (auto son: sons) {
+      if (son) delete son;
+    }
+    sons.clear();
+  }
+  void traverse(std::unordered_map<int, u8>& leafpos_map, std::unordered_map<int, std::unordered_set<int>>& followpos) {
+    nullable = true;
+    bool stop = false;
+    for (auto son: sons) {
+      son->traverse(leafpos_map, followpos);
+      nullable = nullable && son->nullable;
+      if (!stop) {
+        union_inplace(firstpos, son->firstpos);
+        if (!son->nullable) stop = true;
       }
     }
-  }, *cur);
-  return res;
-}
+
+    stop = false;
+    for (auto it = sons.rbegin(); it != sons.rend(); it++) {
+      if (!stop) {
+        union_inplace(lastpos, (*it)->lastpos);
+        if (!(*it)->nullable) stop = true;
+      }
+    }
+
+    // followpos
+    std::unordered_set<int> tmp_lastpos;
+    for (int i = 0; i < sons.size() - 1; ++i) {
+      if (sons[i]->nullable) union_inplace(tmp_lastpos, sons[i]->lastpos);
+      else tmp_lastpos = sons[i]->lastpos;
+      for (auto pos: tmp_lastpos) {
+        union_inplace(followpos[pos], sons[i + 1]->firstpos);
+      }
+    }
+  }
+
+};
+
+struct Disjunction: Re {
+  std::vector<Re*> sons;
+  Re* clone() {
+    auto res = new Disjunction();
+    for (auto son: sons) {
+      res->sons.push_back(son->clone());
+    }
+    return res;
+  }
+  ~Disjunction() {
+    for (auto son: sons) {
+      if (son) delete son;
+    }
+    sons.clear();
+  }
+  void traverse(std::unordered_map<int, u8>& leafpos_map, std::unordered_map<int, std::unordered_set<int>>& followpos) {
+    nullable = false;
+    for (auto son: sons) {
+      son->traverse(leafpos_map, followpos);
+      nullable = nullable || son->nullable;
+      union_inplace(firstpos, son->firstpos);
+      union_inplace(lastpos, son->lastpos);
+    }
+  }
+};
+
+class ReEngine {
+private:
+  void _parse_escaped_metachar(std::string_view sv, std::function<void(char)> update);
+public:
+  ReEngine(): leaf_count(0) {}
+  int leaf_count;
+  static std::tuple<std::unique_ptr<Re>, int> produce(std::string_view sv) {
+    ReEngine engine;
+    return std::make_tuple(engine.parse(sv), engine.leaf_count);
+  }
+  std::unique_ptr<Re> parse(std::string_view sv);
+  std::unique_ptr<Re> parse_without_pipe(std::string_view sv);
+  std::unique_ptr<Re> parse_brackets(std::string_view sv);
+};
 
 
-void parse_escaped_matachar(std::string_view sv, std::function<void(char)> update) {
+
+void ReEngine::_parse_escaped_metachar(std::string_view sv, std::function<void(char)> update) {
   assert(sv[0] == '\\');
   assert(sv.size() == 2);
   switch (sv[1]) {
@@ -116,14 +219,12 @@ void parse_escaped_matachar(std::string_view sv, std::function<void(char)> updat
       break;
     }
     default: {
-      dbg(sv);
-      throw err::ReErr(sv, "unsupported char for escaping: " + std::string(sv.substr(0, 2)));
-      break;
+      ERR_EXIT(sv, "unsupported char for escaping: " + std::string(sv.substr(0, 2)));
     }
   }
 }
 
-std::shared_ptr<Re> parse_brackets(std::string_view sv) {
+std::unique_ptr<Re> ReEngine::parse_brackets(std::string_view sv) {
   std::string_view original_sv = sv;
 
   std::unordered_set<char> hs;
@@ -131,262 +232,259 @@ std::shared_ptr<Re> parse_brackets(std::string_view sv) {
 
   std::function<void(char)> update;
   if (sv[0] == '^') {
-    for (int i = 0; i < 256; ++i) hs.insert(char(i));
+    for (int i = 0; i < 256; ++i) hs.insert(i);
     sv.remove_prefix(1);
-
     update = [&](char c) { hs.erase(c); };
   } else {
     update = [&](char c) { hs.insert(c); };
   }
 
-  std::vector<std::string_view> output = split(sv, "-");
-  for (int i = 0; i < output.size() - 1; ++i) {
-    if (output[i].empty()) continue;
-    if (output[i + 1].empty()) {
-      dbg(original_sv);
-      throw err::ReErr(original_sv, "range not avlid: left/right not match");
-      output[i].remove_suffix(1);
+  std::vector<int> minus_idx;
+  auto tmp_dis = std::make_unique<Disjunction>();
+  while (!sv.empty()) {
+    if (sv[0] == '\\') {
+      if (sv.size() == 1) {
+        ERR_EXIT(original_sv, "escape char is not complete");
+      }
+      std::unordered_set<char> tmp_hs;
+      std::function<void(char)> tmp_update = [&](char c) {
+        tmp_hs.insert(c);
+      };
+      _parse_escaped_metachar(sv.substr(0, 2), tmp_update);
+      if (tmp_hs.size() > 1) {
+        // use disjunction
+        auto d = new Disjunction();
+        for (auto c: tmp_hs) d->sons.push_back(new Char(c, -1));
+        tmp_dis->sons.push_back(d);
+      } else {
+        assert(tmp_hs.size() == 1);
+        auto c = new Char(*tmp_hs.begin(), -1);
+        tmp_dis->sons.push_back(c);
+      }
+      sv.remove_prefix(2);
       continue;
     }
-    int start = int(output[i].back());
-    int end = int(output[i + 1].front());
-    if (end < start) {
-      dbg(original_sv);
-      throw err::ReErr(original_sv, "range not valid: end < start");
+
+    switch (sv[0]) {
+      case '(':
+      case ')':
+      case '[':
+      case ']':
+      case '.':
+      case '|':
+      case '*':
+      case '+':
+      case '?':
+      case '{':
+      case '}':
+      case '^':
+      case '$': {
+        ERR_EXIT(original_sv, sv[0], "not support unescaped metachar in brackets");
+      }
+      case '\\': {
+        UNREACHABLE();
+      }
+      case '-': {
+        minus_idx.push_back(tmp_dis->sons.size());
+        sv.remove_prefix(1);
+        break;
+      }
+      default: {
+        auto c = new Char(sv[0], -1);
+        tmp_dis->sons.push_back(c);
+        sv.remove_prefix(1);
+        break;
+      }
+    }
+  }
+
+  // check minus ilegal
+  for (auto idx: minus_idx) {
+    // check [idx - 1] and [idx] exsistence
+    if (idx < 1 || idx >= tmp_dis->sons.size()) {
+      update('-');
+      continue;
+    }
+
+    // check continuity
+    auto left = tmp_dis->sons[idx - 1];
+    auto right = tmp_dis->sons[idx];
+    if (dynamic_cast<Disjunction*>(left) || dynamic_cast<Disjunction*>(right)) {
+      update('-');
+      continue;
+    }
+
+    auto left_c = dynamic_cast<Char*>(left)->c;
+    auto right_c = dynamic_cast<Char*>(right)->c;
+    if (left_c > right_c) {
+      update('-');
+      continue;
+    }
+
+    // pass
+    for (int i = left_c; i <= right_c; ++i) {
+      update(i);
+    }
+
+    // manually delete for future check
+    delete tmp_dis->sons[idx - 1];
+    delete tmp_dis->sons[idx];
+    tmp_dis->sons[idx - 1] = nullptr;
+    tmp_dis->sons[idx] = nullptr;
+  }
+
+  for (auto& son: tmp_dis->sons) {
+    if (son == nullptr) continue;
+    if (auto dis = dynamic_cast<Disjunction*>(son)) {
+      for (auto s: dis->sons) {
+        assert(dynamic_cast<Char*>(s) != nullptr);
+        update(dynamic_cast<Char*>(s)->c);
+      }
     } else {
-      // valid
-      for (int j = start; j <= end; ++j) {
-        update(char(j));
-      }
-    }
-    output[i].remove_suffix(1);
-    output[i + 1].remove_prefix(1);
-  }
-
-  // parse normal char
-  for (auto s: output) {
-    while (!s.empty()) {
-      if (s[0] == '\\') {
-        // escaped metachar
-        if (s.size() == 1) {
-          dbg(original_sv);
-          throw err::ReErr(original_sv, "escaped char is not complete");
-          s.remove_prefix(1);
-        } else {
-          parse_escaped_matachar(s.substr(0, 2), update);
-          s.remove_prefix(2);
-        }
-        continue;
-      }
-      switch (s[0]) {
-        case '(':
-        case ')':
-        case '[':
-        case ']':
-        case '.':
-        case '|':
-        case '*':
-        case '+':
-        case '?':
-        case '{':
-        case '}':
-        case '^':
-        case '$': {
-          throw err::ReErr(original_sv, "not support unescaped metachar in brackets");
-          s.remove_prefix(1);
-          break;
-        }
-        case '\\': {
-          // meta char
-          UNREACHABLE();
-        }
-        default: {
-          // normal char
-          update(s[0]);
-          s.remove_prefix(1);
-          break;
-        }
-      }
+      assert(dynamic_cast<Char*>(son) != nullptr);
+      update(dynamic_cast<Char*>(son)->c);
     }
   }
 
-  auto res = new Re(Disjunction());
-  auto& inners = std::get<Disjunction>(*res).inners;
+  // delete(and his sons)
+  tmp_dis.reset();
+
+
+  auto dis = std::make_unique<Disjunction>();
   for (auto c: hs) {
-    auto re = std::make_shared<Re>(Re(char(c)));
-    inners.push_back(std::move(re));
+    dis->sons.push_back(new Char(c, leaf_count++));
   }
 
-  return std::shared_ptr<Re>(res);
+  return dis;
 }
 
-
-std::shared_ptr<Re> parse_without_pipe(std::string_view sv) {
+std::unique_ptr<Re> ReEngine::parse_without_pipe(std::string_view sv) {
   // meta char
-  // ()[].|*+\?  not support {} ^ $
+  // ()[].|*+\? not support {} ^ $
 
   // stack elem use Concat
-  std::vector<std::shared_ptr<Re>> stack;
+  auto concat = std::make_unique<Concat>();
+  auto& stack = concat->sons;
   std::string_view original_sv = sv;
 
   std::function<void(char)> update = [&](char c) {
-    auto k = std::make_shared<Re>(c);
-    stack.push_back(std::move(k));
+    stack.push_back(new Char(c, leaf_count++));
   };
 
   while (!sv.empty()) {
     if (sv[0] == '\\') {
       if (sv.size() == 1) {
-        dbg(original_sv);
-          throw err::ReErr(original_sv, "escaped char is not complete");
-          sv.remove_prefix(1);
-      } else {
-          parse_escaped_matachar(sv.substr(0, 2), update);
-          sv.remove_prefix(2);
+        ERR_EXIT(original_sv, "escaped char is not complete");
       }
+      _parse_escaped_metachar(sv.substr(0, 2), update);
+      sv.remove_prefix(2);
       continue;
     }
+
+    #define CHECK_STACK_FOR_UNARY_OP(err_msg) \
+      do { \
+        if (stack.size() == 0) ERR_EXIT(original_sv, err_msg);  \
+      } while (false)
+
     switch (sv[0]) {
       case '+': {
-        if (stack.size() == 0) {
-          dbg(original_sv, sv);
-          throw err::ReErr(original_sv, "empty plus");
-          sv.remove_prefix(1);
-          break;
-        }
-        auto k_son = clone(stack.back());
-        auto k = std::make_shared<Re>(Kleene());
-        std::get<Kleene>(*k).inner = std::move(k_son);
-        stack.push_back(std::move(k));
+        CHECK_STACK_FOR_UNARY_OP("empty plus");
+        auto k = new Kleene(stack.back()->clone());
+        stack.push_back(k);
         sv.remove_prefix(1);
         break;
       }
       case '*': {
-        if (stack.size() == 0) {
-          dbg(original_sv, sv);
-          throw err::ReErr(original_sv, "empty kleene");
-          sv.remove_prefix(1);
-          break;
-        }
-        auto k = new Re(Kleene());
-        std::get<Kleene>(*k).inner = std::move(stack.back());
-        stack.back().reset(k);
+        CHECK_STACK_FOR_UNARY_OP("empty kleene");
+        auto k = new Kleene(stack.back());
+        stack.back() = k;
         sv.remove_prefix(1);
         break;
       }
       case '?': {
-        auto re = new Re(Disjunction());
-        auto& inners = std::get<Disjunction>(*re).inners;
-        inners.resize(2);
-        inners.emplace_back(std::move(stack.back()));
-        inners.emplace_back(std::make_shared<Re>(Eps()));
-        stack.back().reset(re);
+        CHECK_STACK_FOR_UNARY_OP("empty question mark");
+        auto d = new Disjunction();
+        d->sons.push_back(stack.back());
+        d->sons.push_back(new Eps());
+        stack.back() = d;
         sv.remove_prefix(1);
         break;
       }
       case '.': {
-        auto re = std::make_shared<Re>(Disjunction());
-        auto& inners = std::get<Disjunction>(*re).inners;
-        for (int i = 0; i < 256; ++i) inners.push_back(std::make_shared<Re>(char(i)));
+        auto d = new Disjunction();
+        for (int i = 0; i < 256; ++i) d->sons.push_back(new Char(i, leaf_count++));
         sv.remove_prefix(1);
         break;
       }
       case '[': {
+        // check close
         int right_idx = 1;
         while (right_idx < sv.size() && sv[right_idx] != ']') right_idx++;
-        if (right_idx == sv.size()) {
-          dbg(original_sv, sv);
-          throw err::ReErr(original_sv, "brackets not match, lack of right bracket");
-          sv.remove_prefix(1);
-          break;
-        }
+        if (right_idx == sv.size()) ERR_EXIT(original_sv, sv, "brackets not match, lack of right bracket");
         if (right_idx == 1) {
-          // empty
+          // empty bracket
           sv.remove_prefix(2);
-          break;
-        }
-        // [ sv[1]...sv[right_idx - 1] ]
-        auto re = parse_brackets(sv.substr(1, right_idx - 1));
-        stack.push_back(std::move(re));
-        sv.remove_prefix(right_idx + 1);
-        break;
-      }
-      case ']': {
-        dbg(original_sv, sv);
-        throw err::ReErr(original_sv, "brackets not match, too many right brackets");
-        sv.remove_prefix(1);
-        break;
-      }
-      case '(': {
-        // brace matchable
-        int right_idx = sv.size() - 1;
-        while (right_idx >= 0 && sv[right_idx] != ')') right_idx--;
-        if (right_idx < 0) {
-          dbg(original_sv, sv);
-          throw err::ReErr(original_sv, "brace not match, lack of right brace");
-          // skip
-          sv.remove_prefix(1);
           break;
         }
 
-        if (right_idx == 1) {
-          // empty
-          sv.remove_prefix(2);
-          break;
-        }
-        // ( sv[1]...sv[right_idx - 1] )
-        auto re = parse_without_pipe(sv.substr(1, right_idx - 1));
-        stack.push_back(std::move(re));
+        // [ sv[1]...sv[right_idx - 1] ]
+        auto b = parse_brackets(sv.substr(1, right_idx - 1));
+        stack.push_back(b.release());
         sv.remove_prefix(right_idx + 1);
         break;
       }
-      case ')': {
-        dbg(original_sv, sv);
-        throw err::ReErr(original_sv, "brace not match, too many right braces");
+      case '(': {
+        // check close
+        int right_idx = 1;
+        while (right_idx < sv.size() && sv[right_idx] != ')') right_idx++;
+        if (right_idx == sv.size()) ERR_EXIT(original_sv, sv, "brace not match, lack of right brace");
+        if (right_idx == 1) {
+          // empty brace
+          sv.remove_prefix(2);
+          break;
+        }
+
+        // ( sv[1]...sv[right_idx - 1] )
+        auto b = parse_without_pipe(sv.substr(1, right_idx - 1));
+        stack.push_back(b.release());
         sv.remove_prefix(1);
         break;
+      }
+      case ']': {
+        ERR_EXIT(original_sv, sv, "brackets not match, too many right bracket");
+      }
+      case ')': {
+        ERR_EXIT(original_sv, sv, "brace not match, too many right brace");
       }
       case '\\':
       case '|': {
         UNREACHABLE();
       }
       default: {
-        auto re = std::make_shared<Re>(char(sv[0]));
-        stack.push_back(std::move(re));
+        stack.push_back(new Char(sv[0], leaf_count++));
         sv.remove_prefix(1);
         break;
       }
     }
   }
 
-  auto res = new Re(Concat());
-  auto& inners = std::get<Concat>(*res).inners;
-  for (auto& re: stack) {
-    inners.push_back(std::move(re));
-  }
-
-  return std::shared_ptr<Re>(res);
+  return concat;
 }
 
-
-std::shared_ptr<Re> parse(std::string_view sv) {
+std::unique_ptr<Re> ReEngine::parse(std::string_view sv) {
   std::vector<std::string_view> output = split(sv, "|");
-  if (output.size() == 1) {
-    return parse_without_pipe(output[0]);
-  }
+  if (output.size() == 1) return parse_without_pipe(output[0]);
 
-  auto res = new Re(Disjunction());
-  auto& inners = std::get<Disjunction>(*res).inners;
-  inners.reserve(output.size());
+  //auto dis = new Disjunction();
+  auto dis = std::make_unique<Disjunction>();
+  dis->sons.reserve(output.size());
   for (auto s: output) {
     assert(!s.empty());
     auto one = parse_without_pipe(s);
-    inners.emplace_back(std::move(one));
+    dis->sons.emplace_back(one.release());
   }
-  return std::shared_ptr<Re>(res);
+
+  return dis;
 }
 
-
-
-
-};  // namespace parsergen::re
+} // namespace parsergen::re

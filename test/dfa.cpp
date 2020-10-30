@@ -47,6 +47,7 @@ TEST(basic, single_char) {
   EXPECT_FALSE(num_dfa.accept(" "));
 }
 
+
 TEST(basic, metachar) {
   auto [_, meta_dfa] = DfaEngine::produce(R"(\n)");
   EXPECT_TRUE(meta_dfa.accept("\n"));
@@ -60,6 +61,8 @@ TEST(basic, metachar) {
   EXPECT_TRUE(dfa.accept("aaa"));
 }
 
+
+
 TEST(number, integer) {
   auto [_, single_dfa] = DfaEngine::produce(R"([0-9])");
   for (int i = 0; i <= 9; ++i) {
@@ -70,13 +73,13 @@ TEST(number, integer) {
   auto [__, int_dfa] = DfaEngine::produce(R"([1-9][0-9]*)");
   for (int i = 0; i < 1000; ++i) {
     int num = rand();
-    EXPECT_TRUE(int_dfa.accept(std::to_string(num)));
+    ASSERT_TRUE(int_dfa.accept(std::to_string(num))) << num;
   }
   EXPECT_FALSE(int_dfa.accept("asdadasd"));
 }
 
+
 TEST(number, floating) {
-  // FIXME: memory leak
   auto [_, float_dfa] = DfaEngine::produce(R"([-\+]?[0-9]*\.?[0-9]+)");
   EXPECT_TRUE(float_dfa.accept("1.123120220"));
   EXPECT_TRUE(float_dfa.accept("-0.0220"));
@@ -84,8 +87,6 @@ TEST(number, floating) {
   EXPECT_TRUE(float_dfa.accept("+0"));
   EXPECT_TRUE(float_dfa.accept("0.2391"));
   EXPECT_TRUE(float_dfa.accept("12312312324238283.1"));
-  EXPECT_TRUE(float_dfa.accept("12312312324238283."));
+  EXPECT_TRUE(float_dfa.accept("12312312324238283.10100"));
   EXPECT_TRUE(float_dfa.accept("12312312324238283"));
 }
-
-
