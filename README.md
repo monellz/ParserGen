@@ -26,3 +26,11 @@ Optional arguments:
 -t --type       generate type [ast, dfa] default: dfa
 -o --output     speficy output file(*.dot) default: stdout
 ```
+
+*   ```./dot_gen -r "\d+|(0x[0-9a-fA-F]+)" -t ast -o ast.dot```
+
+    ![ast](figures/ast.png)
+
+*   ```./dot_gen -r "\d+|(0x[0-9a-fA-F]+)" -t dfa -o dfa.dot```
+
+    ![dfa](figures/dfa.png)
