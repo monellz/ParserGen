@@ -96,3 +96,12 @@ TEST(real_case, const_integer) {
   EXPECT_TRUE(dfa.accept("0x123123"));
   EXPECT_TRUE(dfa.accept("123123"));
 }
+
+TEST(real_case, ident) {
+  auto [_, dfa] = DfaEngine::produce(R"([_A-Za-z]\w*)");
+  EXPECT_TRUE(dfa.accept("_"));
+  EXPECT_TRUE(dfa.accept("asdasdasd"));
+  EXPECT_TRUE(dfa.accept("number"));
+  EXPECT_TRUE(dfa.accept("a1"));
+  EXPECT_FALSE(dfa.accept("1a"));
+}
