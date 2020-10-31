@@ -90,3 +90,9 @@ TEST(number, floating) {
   EXPECT_TRUE(float_dfa.accept("12312312324238283.10100"));
   EXPECT_TRUE(float_dfa.accept("12312312324238283"));
 }
+
+TEST(real_case, const_integer) {
+  auto [_, dfa] = DfaEngine::produce(R"(\d+|(0x[0-9a-fA-F]+))");
+  EXPECT_TRUE(dfa.accept("0x123123"));
+  EXPECT_TRUE(dfa.accept("123123"));
+}

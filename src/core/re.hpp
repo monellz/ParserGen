@@ -215,6 +215,10 @@ void ReEngine::_parse_escaped_metachar(std::string_view sv, std::function<void(c
       update('_');
       break;
     }
+    case 'd': {
+      for (char c = '0'; c <= '9'; ++c) update(c);
+      break;
+    }
     default: {
       ERR_EXIT(sv, "unsupported char for escaping: " + std::string(sv.substr(0, 2)));
     }
@@ -361,13 +365,21 @@ std::unique_ptr<Re> ReEngine::parse_without_pipe(std::string_view sv) {
   auto& stack = concat->sons;
   std::string_view original_sv = sv;
 
-  std::function<void(char)> update = [&](char c) { stack.push_back(new Char(c, leaf_count++)); };
+  std::function<void(char)> update = [&](char c) {
+    // disjunction
+    assert(stack.size() >= 1);
+    assert(dynamic_cast<Disjunction*>(stack.back()) != nullptr);
+    auto dis = dynamic_cast<Disjunction*>(stack.back());
+    dis->sons.push_back(new Char(c, leaf_count++));
+  };
 
   while (!sv.empty()) {
     if (sv[0] == '\\') {
       if (sv.size() == 1) {
         ERR_EXIT(original_sv, "escaped char is not complete");
       }
+      // push a DISJUNCTION into stack
+      stack.push_back(new Disjunction());
       _parse_escaped_metachar(sv.substr(0, 2), update);
       sv.remove_prefix(2);
       continue;
@@ -439,7 +451,7 @@ std::unique_ptr<Re> ReEngine::parse_without_pipe(std::string_view sv) {
         // ( sv[1]...sv[right_idx - 1] )
         auto b = parse_without_pipe(sv.substr(1, right_idx - 1));
         stack.push_back(b.release());
-        sv.remove_prefix(1);
+        sv.remove_prefix(right_idx + 1);
         break;
       }
       case ']': {
