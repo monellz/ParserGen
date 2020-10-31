@@ -53,6 +53,8 @@ if(NOT ${GTEST_FOUND})
     endif()
 
     set(GTEST_INCLUDE_DIR "${gtest_SOURCE_DIR}/include")
+    set(GTEST_LIBRARY ${gtest_BINARY_DIR}/gtest.a)
+    set(GTEST_MAIN_LIBRARY ${gtest_BINARY_DIR}/gtest_main.a)
 
 endif()
 
