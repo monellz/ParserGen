@@ -116,7 +116,7 @@ struct Concat : Re {
 
     // followpos
     std::unordered_set<int> tmp_lastpos;
-    for (int i = 0; i < sons.size() - 1; ++i) {
+    for (int i = 0; i < int(sons.size()) - 1; ++i) {
       if (sons[i]->nullable)
         union_inplace(tmp_lastpos, sons[i]->lastpos);
       else
@@ -296,7 +296,7 @@ std::unique_ptr<Re> ReEngine::parse_brackets(std::string_view sv) {
   // check minus ilegal
   for (auto idx : minus_idx) {
     // check [idx - 1] and [idx] exsistence
-    if (idx < 1 || idx >= tmp_dis->sons.size()) {
+    if (idx < 1 || size_t(idx) >= tmp_dis->sons.size()) {
       update('-');
       continue;
     }
@@ -410,7 +410,7 @@ std::unique_ptr<Re> ReEngine::parse_without_pipe(std::string_view sv) {
       }
       case '[': {
         // check close
-        int right_idx = 1;
+        size_t right_idx = 1;
         while (right_idx < sv.size() && sv[right_idx] != ']') right_idx++;
         if (right_idx == sv.size()) ERR_EXIT(original_sv, sv, "brackets not match, lack of right bracket");
         if (right_idx == 1) {
@@ -427,7 +427,7 @@ std::unique_ptr<Re> ReEngine::parse_without_pipe(std::string_view sv) {
       }
       case '(': {
         // check close
-        int right_idx = 1;
+        size_t right_idx = 1;
         while (right_idx < sv.size() && sv[right_idx] != ')') right_idx++;
         if (right_idx == sv.size()) ERR_EXIT(original_sv, sv, "brace not match, lack of right brace");
         if (right_idx == 1) {

@@ -58,7 +58,7 @@ struct Dfa {
 
     std::vector<std::tuple<DfaNode, bool>> new_nodes(alive_num);
 
-    for (int i = 0; i < visit.size(); ++i) {
+    for (size_t i = 0; i < visit.size(); ++i) {
       if (visit[i]) {
         // alive node
 
@@ -105,10 +105,10 @@ class DfaEngine {
     states.clear();
     Dfa dfa;
 
-    int label_idx = 0;
+    size_t label_idx = 0;
     states.push_back(expand_re->firstpos);
     auto get_state_idx = [this](std::unordered_set<int>& s) -> int {
-      for (int i = 0; i < this->states.size(); ++i) {
+      for (size_t i = 0; i < this->states.size(); ++i) {
         if (this->states[i] == s) return i;
       }
       this->states.push_back(std::move(s));
