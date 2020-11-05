@@ -60,3 +60,7 @@ endif()
 
 enable_testing()
 add_subdirectory(test)
+
+
+find_package(benchmark REQUIRED)
+add_subdirectory(bench)
