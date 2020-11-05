@@ -157,6 +157,7 @@ int main(int argc, char *argv[]) {
 
   parser.add_argument("-t", "--type")
     .help("generate type [ast, dfa] default: dfa")
+    .default_value(std::string{ "dfa" })
     .action([](const std::string& value) {
     static const std::vector<std::string> choices = { "ast", "dfa" };
     if (std::find(choices.begin(), choices.end(), value) != choices.end()) {
