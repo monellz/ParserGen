@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <functional>
 
 #define DBG_MACRO_NO_WARNING
 #include "dbg.h"
