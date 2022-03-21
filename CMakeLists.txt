@@ -11,6 +11,7 @@ if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -static-libsan")
   endif()
+endif()
 
 include_directories(thirdparty)
 file(GLOB_RECURSE source_files "src/core/*.hpp" "src/core/*.cpp")
@@ -64,5 +65,5 @@ enable_testing()
 add_subdirectory(test)
 
 
-find_package(benchmark REQUIRED)
-add_subdirectory(bench)
+#find_package(benchmark REQUIRED)
+#add_subdirectory(bench)
