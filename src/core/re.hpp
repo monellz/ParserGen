@@ -15,8 +15,9 @@ struct Re {
   std::unordered_set<int> firstpos;
   std::unordered_set<int> lastpos;
 
-  virtual void traverse(std::unordered_map<int, u8>& leafpos_map,
-                        std::unordered_map<int, std::unordered_set<int>>& followpos) = 0;
+  virtual void traverse(
+      std::unordered_map<int, u8>& leafpos_map,
+      std::unordered_map<int, std::unordered_set<int>>& followpos) = 0;
   virtual Re* clone() = 0;
   virtual ~Re(){};
 };
@@ -27,7 +28,8 @@ struct Eps : Re {
     firstpos = {};
     lastpos = {};
   }
-  void traverse(std::unordered_map<int, u8>& leafpos_map, std::unordered_map<int, std::unordered_set<int>>& followpos) {
+  void traverse(std::unordered_map<int, u8>& leafpos_map,
+                std::unordered_map<int, std::unordered_set<int>>& followpos) {
     // done in initialization
     /*
     nullable = true;
@@ -47,7 +49,8 @@ struct Char : Re {
     firstpos = {leaf_count};
     lastpos = {leaf_count};
   }
-  void traverse(std::unordered_map<int, u8>& leafpos_map, std::unordered_map<int, std::unordered_set<int>>& followpos) {
+  void traverse(std::unordered_map<int, u8>& leafpos_map,
+                std::unordered_map<int, std::unordered_set<int>>& followpos) {
     // partly done in initialization
     /*
     nullable = false;
@@ -63,7 +66,8 @@ struct Char : Re {
 struct Kleene : Re {
   Re* son;
   Kleene(Re* _son) : son(_son) {}
-  void traverse(std::unordered_map<int, u8>& leafpos_map, std::unordered_map<int, std::unordered_set<int>>& followpos) {
+  void traverse(std::unordered_map<int, u8>& leafpos_map,
+                std::unordered_map<int, std::unordered_set<int>>& followpos) {
     son->traverse(leafpos_map, followpos);
     nullable = true;
     firstpos = son->firstpos;
@@ -94,7 +98,8 @@ struct Concat : Re {
     }
     sons.clear();
   }
-  void traverse(std::unordered_map<int, u8>& leafpos_map, std::unordered_map<int, std::unordered_set<int>>& followpos) {
+  void traverse(std::unordered_map<int, u8>& leafpos_map,
+                std::unordered_map<int, std::unordered_set<int>>& followpos) {
     nullable = true;
     bool stop = false;
     for (auto son : sons) {
@@ -143,7 +148,8 @@ struct Disjunction : Re {
     }
     sons.clear();
   }
-  void traverse(std::unordered_map<int, u8>& leafpos_map, std::unordered_map<int, std::unordered_set<int>>& followpos) {
+  void traverse(std::unordered_map<int, u8>& leafpos_map,
+                std::unordered_map<int, std::unordered_set<int>>& followpos) {
     nullable = false;
     for (auto son : sons) {
       son->traverse(leafpos_map, followpos);
@@ -156,7 +162,8 @@ struct Disjunction : Re {
 
 class ReEngine {
  private:
-  void _parse_escaped_metachar(std::string_view sv, std::function<void(char)> update);
+  void _parse_escaped_metachar(std::string_view sv,
+                               std::function<void(char)> update);
 
  public:
   ReEngine() : leaf_count(0) {}
@@ -170,7 +177,8 @@ class ReEngine {
   std::unique_ptr<Re> parse_brackets(std::string_view sv);
 };
 
-void ReEngine::_parse_escaped_metachar(std::string_view sv, std::function<void(char)> update) {
+void ReEngine::_parse_escaped_metachar(std::string_view sv,
+                                       std::function<void(char)> update) {
   assert(sv[0] == '\\');
   assert(sv.size() == 2);
   switch (sv[1]) {
@@ -220,7 +228,8 @@ void ReEngine::_parse_escaped_metachar(std::string_view sv, std::function<void(c
       break;
     }
     default: {
-      ERR_EXIT(sv, "unsupported char for escaping: " + std::string(sv.substr(0, 2)));
+      ERR_EXIT(
+          sv, "unsupported char for escaping: " + std::string(sv.substr(0, 2)));
     }
   }
 }
@@ -278,7 +287,8 @@ std::unique_ptr<Re> ReEngine::parse_brackets(std::string_view sv) {
       case '}':
       case '^':
       case '$': {
-        ERR_EXIT(original_sv, sv[0], "not support unescaped metachar in brackets");
+        ERR_EXIT(original_sv, sv[0],
+                 "not support unescaped metachar in brackets");
       }
       case '\\': {
         UNREACHABLE();
@@ -416,7 +426,8 @@ std::unique_ptr<Re> ReEngine::parse_without_pipe(std::string_view sv) {
       }
       case '.': {
         auto d = new Disjunction();
-        for (int i = 0; i < 256; ++i) d->sons.push_back(new Char(i, leaf_count++));
+        for (int i = 0; i < 256; ++i)
+          d->sons.push_back(new Char(i, leaf_count++));
         sv.remove_prefix(1);
         break;
       }
@@ -424,7 +435,9 @@ std::unique_ptr<Re> ReEngine::parse_without_pipe(std::string_view sv) {
         // check close
         size_t right_idx = 1;
         while (right_idx < sv.size() && sv[right_idx] != ']') right_idx++;
-        if (right_idx == sv.size()) ERR_EXIT(original_sv, sv, "brackets not match, lack of right bracket");
+        if (right_idx == sv.size())
+          ERR_EXIT(original_sv, sv,
+                   "brackets not match, lack of right bracket");
         if (right_idx == 1) {
           // empty bracket
           sv.remove_prefix(2);
@@ -441,7 +454,8 @@ std::unique_ptr<Re> ReEngine::parse_without_pipe(std::string_view sv) {
         // check close
         size_t right_idx = 1;
         while (right_idx < sv.size() && sv[right_idx] != ')') right_idx++;
-        if (right_idx == sv.size()) ERR_EXIT(original_sv, sv, "brace not match, lack of right brace");
+        if (right_idx == sv.size())
+          ERR_EXIT(original_sv, sv, "brace not match, lack of right brace");
         if (right_idx == 1) {
           // empty brace
           sv.remove_prefix(2);

@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+
 #include <string_view>
 #include <unordered_set>
 
@@ -14,7 +15,7 @@ TEST(basic, single_word_char) {
   for (char c = 'A'; c != 'Z'; ++c) words.insert(std::string(1, c));
   for (char c = '0'; c != '9'; ++c) words.insert(std::string(1, c));
 
-  for (auto c: words) {
+  for (auto c : words) {
     auto [ptr, leaf_count] = ReEngine::produce(c);
     EXPECT_EQ(leaf_count, 1);
     auto res = ptr.release();

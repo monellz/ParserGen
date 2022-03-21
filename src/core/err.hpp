@@ -13,8 +13,10 @@ class BaseErr : public std::exception {
 
 class ReErr : public BaseErr {
  public:
-  ReErr(std::string_view re, const char* s) : BaseErr("(" + std::string(re) + ")" + s) {}
-  ReErr(std::string_view re, std::string s) : BaseErr("(" + std::string(re) + ")" + s) {}
+  ReErr(std::string_view re, const char* s)
+      : BaseErr("(" + std::string(re) + ")" + s) {}
+  ReErr(std::string_view re, std::string s)
+      : BaseErr("(" + std::string(re) + ")" + s) {}
 };
 
 }  // namespace parsergen::err

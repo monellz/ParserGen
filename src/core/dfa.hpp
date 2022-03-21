@@ -89,7 +89,8 @@ class DfaEngine {
   std::unordered_map<int, std::unordered_set<int>> followpos;
 
  public:
-  DfaEngine(std::unique_ptr<re::Re> _re, int _leaf_count) : leaf_count(_leaf_count) {
+  DfaEngine(std::unique_ptr<re::Re> _re, int _leaf_count)
+      : leaf_count(_leaf_count) {
     auto ex_re = new re::Concat();
     ex_re->sons.push_back(_re.release());
     ex_re->sons.push_back(new re::Char('\0', leaf_count++));
@@ -123,7 +124,8 @@ class DfaEngine {
       for (auto pos : s) u[leafpos_map.at(pos)].insert(pos);
       for (auto& [c, pos_set] : u) {
         std::unordered_set<int> new_set;
-        // followpos use [] instead of AT, because default followpos is empty set
+        // followpos use [] instead of AT, because default followpos is empty
+        // set
         for (auto pos : pos_set) union_inplace(new_set, followpos[pos]);
         auto next_state_idx = get_state_idx(new_set);
         cur[c] = next_state_idx;

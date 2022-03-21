@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+
 #include <string_view>
 #include <unordered_set>
 
@@ -8,15 +9,14 @@
 using namespace parsergen::dfa;
 using namespace parsergen::err;
 
-
 TEST(set, set_cmp) {
-  std::unordered_set<int> a = {1,2,3};
-  std::unordered_set<int> b = {1,2,3};
+  std::unordered_set<int> a = {1, 2, 3};
+  std::unordered_set<int> b = {1, 2, 3};
   std::unordered_set<int> c;
   c.insert(3);
   c.insert(2);
   c.insert(1);
-  std::unordered_set<int> d = {1,2,3,4};
+  std::unordered_set<int> d = {1, 2, 3, 4};
   EXPECT_EQ(a.size(), 3);
   EXPECT_EQ(b.size(), 3);
   EXPECT_EQ(a, b);
@@ -47,7 +47,6 @@ TEST(basic, single_char) {
   EXPECT_FALSE(num_dfa.accept(" "));
 }
 
-
 TEST(basic, metachar) {
   auto [_, meta_dfa] = DfaEngine::produce(R"(\n)");
   EXPECT_TRUE(meta_dfa.accept("\n"));
@@ -60,8 +59,6 @@ TEST(basic, metachar) {
   EXPECT_TRUE(dfa.accept("aa"));
   EXPECT_TRUE(dfa.accept("aaa"));
 }
-
-
 
 TEST(number, integer) {
   auto [_, single_dfa] = DfaEngine::produce(R"([0-9])");
@@ -77,7 +74,6 @@ TEST(number, integer) {
   }
   EXPECT_FALSE(int_dfa.accept("asdadasd"));
 }
-
 
 TEST(number, floating) {
   auto [_, float_dfa] = DfaEngine::produce(R"([-\+]?[0-9]*\.?[0-9]+)");

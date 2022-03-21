@@ -2,11 +2,11 @@
 
 #include <cassert>
 #include <cstdint>
+#include <functional>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <functional>
 
 #define DBG_MACRO_NO_WARNING
 #include "dbg.h"
@@ -34,11 +34,13 @@ struct overloaded : Ts... {
 template <class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
 
-inline std::vector<std::string_view> split(std::string_view sv, std::string_view delims) {
+inline std::vector<std::string_view> split(std::string_view sv,
+                                           std::string_view delims) {
   std::vector<std::string_view> output;
-  for (auto first = sv.data(), second = sv.data(), last = first + sv.size(); second != last && first != last;
-       first = second + 1) {
-    second = std::find_first_of(first, last, std::cbegin(delims), std::cend(delims));
+  for (auto first = sv.data(), second = sv.data(), last = first + sv.size();
+       second != last && first != last; first = second + 1) {
+    second =
+        std::find_first_of(first, last, std::cbegin(delims), std::cend(delims));
     if (first != second) output.emplace_back(first, second - first);
   }
   return output;
@@ -46,7 +48,8 @@ inline std::vector<std::string_view> split(std::string_view sv, std::string_view
 
 // TODO: more efficient way(consume src_set)
 template <typename T>
-inline void union_inplace(std::unordered_set<T>& dst, const std::unordered_set<T>& src) {
+inline void union_inplace(std::unordered_set<T>& dst,
+                          const std::unordered_set<T>& src) {
   for (auto c : src) dst.insert(c);
 }
 

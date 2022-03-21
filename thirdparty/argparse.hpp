@@ -51,14 +51,16 @@ SOFTWARE.
 
 namespace argparse {
 
-namespace details { // namespace for helper methods
+namespace details {  // namespace for helper methods
 
-template <typename... Ts> struct is_container_helper {};
+template <typename... Ts>
+struct is_container_helper {};
 
 template <typename T, typename _ = void>
 struct is_container : std::false_type {};
 
-template <> struct is_container<std::string> : std::false_type {};
+template <>
+struct is_container<std::string> : std::false_type {};
 
 template <typename T>
 struct is_container<
@@ -75,22 +77,33 @@ static constexpr bool is_container_v = is_container<T>::value;
 
 namespace {
 
-template <typename T> constexpr bool standard_signed_integer = false;
-template <> constexpr bool standard_signed_integer<signed char> = true;
-template <> constexpr bool standard_signed_integer<short int> = true;
-template <> constexpr bool standard_signed_integer<int> = true;
-template <> constexpr bool standard_signed_integer<long int> = true;
-template <> constexpr bool standard_signed_integer<long long int> = true;
+template <typename T>
+constexpr bool standard_signed_integer = false;
+template <>
+constexpr bool standard_signed_integer<signed char> = true;
+template <>
+constexpr bool standard_signed_integer<short int> = true;
+template <>
+constexpr bool standard_signed_integer<int> = true;
+template <>
+constexpr bool standard_signed_integer<long int> = true;
+template <>
+constexpr bool standard_signed_integer<long long int> = true;
 
-template <typename T> constexpr bool standard_unsigned_integer = false;
-template <> constexpr bool standard_unsigned_integer<unsigned char> = true;
-template <> constexpr bool standard_unsigned_integer<unsigned short int> = true;
-template <> constexpr bool standard_unsigned_integer<unsigned int> = true;
-template <> constexpr bool standard_unsigned_integer<unsigned long int> = true;
+template <typename T>
+constexpr bool standard_unsigned_integer = false;
+template <>
+constexpr bool standard_unsigned_integer<unsigned char> = true;
+template <>
+constexpr bool standard_unsigned_integer<unsigned short int> = true;
+template <>
+constexpr bool standard_unsigned_integer<unsigned int> = true;
+template <>
+constexpr bool standard_unsigned_integer<unsigned long int> = true;
 template <>
 constexpr bool standard_unsigned_integer<unsigned long long int> = true;
 
-}
+}  // namespace
 
 template <typename T>
 constexpr bool standard_integer =
@@ -160,17 +173,19 @@ inline auto do_from_chars(std::string_view s) -> T {
   } else if (ec == std::errc::result_out_of_range) {
     throw std::range_error{"not representable"};
   } else {
-    return x; // unreachable
+    return x;  // unreachable
   }
 }
 
-template <class T, auto Param = 0> struct parse_number {
+template <class T, auto Param = 0>
+struct parse_number {
   auto operator()(std::string_view s) -> T {
     return do_from_chars<T, Param>(s);
   }
 };
 
-template <class T> struct parse_number<T, 16> {
+template <class T>
+struct parse_number<T, 16> {
   auto operator()(std::string_view s) -> T {
     if (auto [ok, rest] = consume_hex_prefix(s); ok)
       return do_from_chars<T, 16>(rest);
@@ -179,7 +194,8 @@ template <class T> struct parse_number<T, 16> {
   }
 };
 
-template <class T> struct parse_number<T> {
+template <class T>
+struct parse_number<T> {
   auto operator()(std::string_view s) -> T {
     if (auto [ok, rest] = consume_hex_prefix(s); ok)
       return do_from_chars<T, 16>(rest);
@@ -192,14 +208,19 @@ template <class T> struct parse_number<T> {
 
 namespace {
 
-template <class T> constexpr auto generic_strtod = nullptr;
-template <> constexpr auto generic_strtod<float> = strtof;
-template <> constexpr auto generic_strtod<double> = strtod;
-template <> constexpr auto generic_strtod<long double> = strtold;
+template <class T>
+constexpr auto generic_strtod = nullptr;
+template <>
+constexpr auto generic_strtod<float> = strtof;
+template <>
+constexpr auto generic_strtod<double> = strtod;
+template <>
+constexpr auto generic_strtod<long double> = strtold;
 
-}
+}  // namespace
 
-template <class T> inline auto do_strtod(std::string const &s) -> T {
+template <class T>
+inline auto do_strtod(std::string const &s) -> T {
   if (isspace(static_cast<unsigned char>(s[0])) || s[0] == '+')
     throw std::invalid_argument{"pattern not found"};
 
@@ -215,11 +236,12 @@ template <class T> inline auto do_strtod(std::string const &s) -> T {
   } else if (errno == ERANGE) {
     throw std::range_error{"not representable"};
   } else {
-    return x; // unreachable
+    return x;  // unreachable
   }
 }
 
-template <class T> struct parse_number<T, chars_format::general> {
+template <class T>
+struct parse_number<T, chars_format::general> {
   auto operator()(std::string const &s) -> T {
     if (auto r = consume_hex_prefix(s); r.is_hexadecimal)
       throw std::invalid_argument{
@@ -229,7 +251,8 @@ template <class T> struct parse_number<T, chars_format::general> {
   }
 };
 
-template <class T> struct parse_number<T, chars_format::hex> {
+template <class T>
+struct parse_number<T, chars_format::hex> {
   auto operator()(std::string const &s) -> T {
     if (auto r = consume_hex_prefix(s); !r.is_hexadecimal)
       throw std::invalid_argument{"chars_format::hex parses hexfloat"};
@@ -238,7 +261,8 @@ template <class T> struct parse_number<T, chars_format::hex> {
   }
 };
 
-template <class T> struct parse_number<T, chars_format::scientific> {
+template <class T>
+struct parse_number<T, chars_format::scientific> {
   auto operator()(std::string const &s) -> T {
     if (auto r = consume_hex_prefix(s); r.is_hexadecimal)
       throw std::invalid_argument{
@@ -251,7 +275,8 @@ template <class T> struct parse_number<T, chars_format::scientific> {
   }
 };
 
-template <class T> struct parse_number<T, chars_format::fixed> {
+template <class T>
+struct parse_number<T, chars_format::fixed> {
   auto operator()(std::string const &s) -> T {
     if (auto r = consume_hex_prefix(s); r.is_hexadecimal)
       throw std::invalid_argument{
@@ -264,7 +289,7 @@ template <class T> struct parse_number<T, chars_format::fixed> {
   }
 };
 
-} // namespace details
+}  // namespace details
 
 class ArgumentParser;
 
@@ -275,7 +300,8 @@ class Argument {
 
   template <size_t N, size_t... I>
   explicit Argument(std::string_view(&&a)[N], std::index_sequence<I...>)
-      : mIsOptional((is_optional(a[I]) || ...)), mIsRequired(false),
+      : mIsOptional((is_optional(a[I]) || ...)),
+        mIsRequired(false),
         mIsUsed(false) {
     ((void)mNames.emplace_back(a[I]), ...);
     std::sort(
@@ -284,7 +310,7 @@ class Argument {
         });
   }
 
-public:
+ public:
   template <size_t N>
   explicit Argument(std::string_view(&&a)[N])
       : Argument(std::move(a), std::make_index_sequence<N>{}) {}
@@ -311,7 +337,7 @@ public:
   }
 
   template <class F, class... Args>
-  auto action(F &&aAction, Args &&... aBound)
+  auto action(F &&aAction, Args &&...aBound)
       -> std::enable_if_t<std::is_invocable_v<F, Args..., std::string const>,
                           Argument &> {
     using action_type = std::conditional_t<
@@ -452,8 +478,7 @@ public:
       } else {
         if (mValues.size() != expected && !mDefaultValue.has_value()) {
           std::stringstream stream;
-          if (!mUsedName.empty())
-            stream << mUsedName << ": ";
+          if (!mUsedName.empty()) stream << mUsedName << ": ";
           stream << *expected << " argument(s) expected. " << mValues.size()
                  << " provided.";
           throw std::runtime_error(stream.str());
@@ -473,7 +498,7 @@ public:
     return std::accumulate(std::begin(mNames), std::end(mNames), size_t(0),
                            [](const auto &sum, const auto &s) {
                              return sum + s.size() +
-                                    1; // +1 for space between names
+                                    1;  // +1 for space between names
                            });
   }
 
@@ -483,13 +508,13 @@ public:
     std::copy(std::begin(argument.mNames), std::end(argument.mNames),
               std::ostream_iterator<std::string>(nameStream, " "));
     stream << nameStream.str() << "\t" << argument.mHelp;
-    if (argument.mIsRequired)
-      stream << "[Required]";
+    if (argument.mIsRequired) stream << "[Required]";
     stream << "\n";
     return stream;
   }
 
-  template <typename T> bool operator!=(const T &aRhs) const {
+  template <typename T>
+  bool operator!=(const T &aRhs) const {
     return !(*this == aRhs);
   }
 
@@ -497,7 +522,8 @@ public:
    * Compare to an argument value of known type
    * @throws std::logic_error in case of incompatible types
    */
-  template <typename T> bool operator==(const T &aRhs) const {
+  template <typename T>
+  bool operator==(const T &aRhs) const {
     if constexpr (!details::is_container_v<T>) {
       return get<T>() == aRhs;
     } else {
@@ -510,7 +536,7 @@ public:
     }
   }
 
-private:
+ private:
   static constexpr int eof = std::char_traits<char>::eof();
 
   static auto lookahead(std::string_view s) -> int {
@@ -551,19 +577,19 @@ private:
   static bool is_decimal_literal(std::string_view s) {
     auto is_digit = [](auto c) constexpr {
       switch (c) {
-      case '0':
-      case '1':
-      case '2':
-      case '3':
-      case '4':
-      case '5':
-      case '6':
-      case '7':
-      case '8':
-      case '9':
-        return true;
-      default:
-        return false;
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+          return true;
+        default:
+          return false;
       }
     };
 
@@ -574,54 +600,54 @@ private:
     };
 
     switch (lookahead(s)) {
-    case '0': {
-      s.remove_prefix(1);
-      if (s.empty())
-        return true;
-      else
-        goto integer_part;
-    }
-    case '1':
-    case '2':
-    case '3':
-    case '4':
-    case '5':
-    case '6':
-    case '7':
-    case '8':
-    case '9': {
-      s = consume_digits(s);
-      if (s.empty())
-        return true;
-      else
-        goto integer_part_consumed;
-    }
-    case '.': {
-      s.remove_prefix(1);
-      goto post_decimal_point;
-    }
-    default:
-      return false;
+      case '0': {
+        s.remove_prefix(1);
+        if (s.empty())
+          return true;
+        else
+          goto integer_part;
+      }
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '7':
+      case '8':
+      case '9': {
+        s = consume_digits(s);
+        if (s.empty())
+          return true;
+        else
+          goto integer_part_consumed;
+      }
+      case '.': {
+        s.remove_prefix(1);
+        goto post_decimal_point;
+      }
+      default:
+        return false;
     }
 
   integer_part:
     s = consume_digits(s);
   integer_part_consumed:
     switch (lookahead(s)) {
-    case '.': {
-      s.remove_prefix(1);
-      if (is_digit(lookahead(s)))
-        goto post_decimal_point;
-      else
-        goto exponent_part_opt;
-    }
-    case 'e':
-    case 'E': {
-      s.remove_prefix(1);
-      goto post_e;
-    }
-    default:
-      return false;
+      case '.': {
+        s.remove_prefix(1);
+        if (is_digit(lookahead(s)))
+          goto post_decimal_point;
+        else
+          goto exponent_part_opt;
+      }
+      case 'e':
+      case 'E': {
+        s.remove_prefix(1);
+        goto post_e;
+      }
+      default:
+        return false;
     }
 
   post_decimal_point:
@@ -634,22 +660,22 @@ private:
 
   exponent_part_opt:
     switch (lookahead(s)) {
-    case eof:
-      return true;
-    case 'e':
-    case 'E': {
-      s.remove_prefix(1);
-      goto post_e;
-    }
-    default:
-      return false;
+      case eof:
+        return true;
+      case 'e':
+      case 'E': {
+        s.remove_prefix(1);
+        goto post_e;
+      }
+      default:
+        return false;
     }
 
   post_e:
     switch (lookahead(s)) {
-    case '-':
-    case '+':
-      s.remove_prefix(1);
+      case '-':
+      case '+':
+        s.remove_prefix(1);
     }
     if (is_digit(lookahead(s))) {
       s = consume_digits(s);
@@ -672,17 +698,17 @@ private:
    */
   static bool is_positional(std::string_view aName) {
     switch (lookahead(aName)) {
-    case eof:
-      return true;
-    case '-': {
-      aName.remove_prefix(1);
-      if (aName.empty())
+      case eof:
         return true;
-      else
-        return is_decimal_literal(aName);
-    }
-    default:
-      return true;
+      case '-': {
+        aName.remove_prefix(1);
+        if (aName.empty())
+          return true;
+        else
+          return is_decimal_literal(aName);
+      }
+      default:
+        return true;
     }
   }
 
@@ -690,7 +716,8 @@ private:
    * Get argument value given a type
    * @throws std::logic_error in case of incompatible types
    */
-  template <typename T> T get() const {
+  template <typename T>
+  T get() const {
     if (!mValues.empty()) {
       if constexpr (details::is_container_v<T>)
         return any_cast_container<T>(mValues);
@@ -708,7 +735,8 @@ private:
    * @pre The object has no default value.
    * @returns The stored value if any, std::nullopt otherwise.
    */
-  template <typename T> auto present() const -> std::optional<T> {
+  template <typename T>
+  auto present() const -> std::optional<T> {
     if (mDefaultValue.has_value())
       throw std::logic_error("Argument with default value always presents");
 
@@ -745,16 +773,15 @@ private:
   int mNumArgs = 1;
   bool mIsOptional : 1;
   bool mIsRequired : 1;
-  bool mIsUsed : 1; // True if the optional argument is used by user
+  bool mIsUsed : 1;  // True if the optional argument is used by user
 };
 
 class ArgumentParser {
-public:
-  explicit ArgumentParser(std::string aProgramName = {}, std::string aVersion = "1.0")
+ public:
+  explicit ArgumentParser(std::string aProgramName = {},
+                          std::string aVersion = "1.0")
       : mProgramName(std::move(aProgramName)), mVersion(std::move(aVersion)) {
-    add_argument("-h", "--help")
-        .help("shows help message and exits")
-        .nargs(0);
+    add_argument("-h", "--help").help("shows help message and exits").nargs(0);
     add_argument("-v", "--version")
         .help("prints version information and exits")
         .nargs(0);
@@ -783,7 +810,8 @@ public:
 
   // Parameter packing
   // Call add_argument with variadic number of string arguments
-  template <typename... Targs> Argument &add_argument(Targs... Fargs) {
+  template <typename... Targs>
+  Argument &add_argument(Targs... Fargs) {
     using array_of_sv = std::string_view[sizeof...(Targs)];
     auto tArgument = mOptionalArguments.emplace(cend(mOptionalArguments),
                                                 array_of_sv{Fargs...});
@@ -799,7 +827,7 @@ public:
   // Parameter packed add_parents method
   // Accepts a variadic number of ArgumentParser objects
   template <typename... Targs>
-  ArgumentParser &add_parents(const Targs &... Fargs) {
+  ArgumentParser &add_parents(const Targs &...Fargs) {
     for (const ArgumentParser &tParentParser : {std::ref(Fargs)...}) {
       for (auto &tArgument : tParentParser.mPositionalArguments) {
         auto it =
@@ -850,7 +878,8 @@ public:
    * @throws std::logic_error if the option has no value
    * @throws std::bad_any_cast if the option is not of type T
    */
-  template <typename T = std::string> T get(std::string_view aArgumentName) const {
+  template <typename T = std::string>
+  T get(std::string_view aArgumentName) const {
     return (*this)[aArgumentName].get<T>();
   }
 
@@ -889,8 +918,7 @@ public:
       }
       stream << "\n\n";
 
-      if(!parser.mDescription.empty())
-        stream << parser.mDescription << "\n\n";
+      if (!parser.mDescription.empty()) stream << parser.mDescription << "\n\n";
 
       if (!parser.mPositionalArguments.empty())
         stream << "Positional arguments:\n";
@@ -909,8 +937,7 @@ public:
         stream << mOptionalArgument;
       }
 
-      if(!parser.mEpilog.empty())
-        stream << parser.mEpilog << "\n\n";
+      if (!parser.mEpilog.empty()) stream << parser.mEpilog << "\n\n";
     }
 
     return stream;
@@ -932,7 +959,7 @@ public:
     return out.str();
   }
 
-private:
+ private:
   /*
    * @throws std::runtime_error in case of any invalid argument
    */
@@ -963,7 +990,7 @@ private:
           std::cout << *this;
           std::exit(0);
         }
-        // the second optional argument is --version 
+        // the second optional argument is --version
         else if (tArgument == std::next(mOptionalArguments.begin(), 1)) {
           std::cout << mVersion << "\n";
           std::exit(0);
@@ -1004,8 +1031,7 @@ private:
 
   // Used by print_help.
   size_t get_length_of_longest_argument() const {
-    if (mArgumentMap.empty())
-      return 0;
+    if (mArgumentMap.empty()) return 0;
     std::vector<size_t> argumentLengths(mArgumentMap.size());
     std::transform(std::begin(mArgumentMap), std::end(mArgumentMap),
                    std::begin(argumentLengths), [](const auto &argPair) {
@@ -1032,4 +1058,4 @@ private:
   std::map<std::string_view, list_iterator, std::less<>> mArgumentMap;
 };
 
-} // namespace argparse
+}  // namespace argparse

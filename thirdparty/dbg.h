@@ -72,13 +72,9 @@ License (MIT):
 namespace dbg {
 
 #ifdef DBG_MACRO_UNIX
-inline bool isColorizedOutputEnabled() {
-  return isatty(fileno(stderr));
-}
+inline bool isColorizedOutputEnabled() { return isatty(fileno(stderr)); }
 #else
-inline bool isColorizedOutputEnabled() {
-  return true;
-}
+inline bool isColorizedOutputEnabled() { return true; }
 #endif
 
 struct time {};
@@ -200,17 +196,13 @@ std::string type_name() {
   return get_type_name(type_tag<T>{});
 }
 
-inline std::string get_type_name(type_tag<short>) {
-  return "short";
-}
+inline std::string get_type_name(type_tag<short>) { return "short"; }
 
 inline std::string get_type_name(type_tag<unsigned short>) {
   return "unsigned short";
 }
 
-inline std::string get_type_name(type_tag<long>) {
-  return "long";
-}
+inline std::string get_type_name(type_tag<long>) { return "long"; }
 
 inline std::string get_type_name(type_tag<unsigned long>) {
   return "unsigned long";
@@ -267,10 +259,7 @@ struct nonesuch {
 template <typename...>
 using void_t = void;
 
-template <class Default,
-          class AlwaysVoid,
-          template <class...>
-          class Op,
+template <class Default, class AlwaysVoid, template <class...> class Op,
           class... Args>
 struct detector {
   using value_t = std::false_type;
@@ -286,8 +275,9 @@ struct detector<Default, void_t<Op<Args...>>, Op, Args...> {
 }  // namespace detail_detector
 
 template <template <class...> class Op, class... Args>
-using is_detected = typename detail_detector::
-    detector<detail_detector::nonesuch, void, Op, Args...>::value_t;
+using is_detected =
+    typename detail_detector::detector<detail_detector::nonesuch, void, Op,
+                                       Args...>::value_t;
 
 namespace detail {
 
@@ -664,8 +654,8 @@ class DebugOutput {
 
   template <typename... T>
   auto print(std::initializer_list<expr_t> exprs,
-             std::initializer_list<std::string> types,
-             T&&... values) -> last_t<T...> {
+             std::initializer_list<std::string> types, T&&... values)
+      -> last_t<T...> {
     if (exprs.size() != sizeof...(values)) {
       std::cerr
           << m_location << ansi(ANSI_WARN)
@@ -698,9 +688,7 @@ class DebugOutput {
   }
 
   template <typename T, typename... U>
-  auto print_impl(const expr_t* exprs,
-                  const std::string* types,
-                  T&& value,
+  auto print_impl(const expr_t* exprs, const std::string* types, T&& value,
                   U&&... rest) -> last_t<T, U...> {
     print_impl(exprs, types, std::forward<T>(value));
     return print_impl(exprs + 1, types + 1, std::forward<U>(rest)...);

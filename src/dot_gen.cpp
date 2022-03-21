@@ -1,19 +1,18 @@
-#include <iostream>
 #include <fstream>
-#include <string>
+#include <iostream>
 #include <set>
-
-#include "core/re.hpp"
-#include "core/dfa.hpp"
+#include <string>
 
 #include "argparse.hpp"
+#include "core/dfa.hpp"
+#include "core/re.hpp"
 
 using namespace parsergen;
 
 /*
  * generate dot file for Regex/Dfa/Nfa
- * 
- */ 
+ *
+ */
 
 std::string dot_from_re(std::unique_ptr<re::Re> regex, bool verbose) {
   std::ostringstream out;
@@ -25,26 +24,29 @@ std::string dot_from_re(std::unique_ptr<re::Re> regex, bool verbose) {
   re->traverse(leafpos_map, followpos);
   std::vector<re::Re*> stack;
 
-  std::function<std::string(const std::unordered_set<int>&)> set_to_string = [](const std::unordered_set<int>& s) {
-    std::string o = "{";
-    std::set<int> new_s(s.begin(), s.end());
-    for (auto i: new_s) o += std::to_string(i) + ",";
-    if (!new_s.empty()) o.pop_back();
-    o += "}";
-    return o;
-  };
+  std::function<std::string(const std::unordered_set<int>&)> set_to_string =
+      [](const std::unordered_set<int>& s) {
+        std::string o = "{";
+        std::set<int> new_s(s.begin(), s.end());
+        for (auto i : new_s) o += std::to_string(i) + ",";
+        if (!new_s.empty()) o.pop_back();
+        o += "}";
+        return o;
+      };
 
-  std::function<std::string(re::Re* r, const std::unordered_set<int>&)> to_string = [&](re::Re* r, const std::unordered_set<int>& fp) {
-    std::string label;
-    label += std::string("nullable: ") + (r->nullable? "true": "false") + "\n";
-    label += std::string("firstpos: ") + set_to_string(r->firstpos) + "\n";
-    label += std::string("lastpos: ") + set_to_string(r->lastpos) + "\n";
-    if (auto c = dynamic_cast<re::Char*>(r)) {
-      label += std::string("pos: ") + std::to_string(c->leaf_count) + "\n";
-      label += std::string("followpos: ") + set_to_string(fp) + "\n";
-    }
-    return label;
-  };
+  std::function<std::string(re::Re * r, const std::unordered_set<int>&)>
+      to_string = [&](re::Re* r, const std::unordered_set<int>& fp) {
+        std::string label;
+        label +=
+            std::string("nullable: ") + (r->nullable ? "true" : "false") + "\n";
+        label += std::string("firstpos: ") + set_to_string(r->firstpos) + "\n";
+        label += std::string("lastpos: ") + set_to_string(r->lastpos) + "\n";
+        if (auto c = dynamic_cast<re::Char*>(r)) {
+          label += std::string("pos: ") + std::to_string(c->leaf_count) + "\n";
+          label += std::string("followpos: ") + set_to_string(fp) + "\n";
+        }
+        return label;
+      };
 
   stack.push_back(re);
   std::unordered_map<re::Re*, int> idx_map;
@@ -86,7 +88,7 @@ std::string dot_from_re(std::unique_ptr<re::Re> regex, bool verbose) {
         label += to_string(c, {});
       }
       out << top_idx << " [ shape = circle, label = \"" << label << "\" ]\n";
-      for (auto son: c->sons) {
+      for (auto son : c->sons) {
         assert(idx_map.find(son) == idx_map.end());
         idx_map[son] = idx++;
         stack.push_back(son);
@@ -99,7 +101,7 @@ std::string dot_from_re(std::unique_ptr<re::Re> regex, bool verbose) {
         label += to_string(c, {});
       }
       out << top_idx << " [ shape = circle, label = \"" << label << "\" ]\n";
-      for (auto son: c->sons) {
+      for (auto son : c->sons) {
         assert(idx_map.find(son) == idx_map.end());
         idx_map[son] = idx++;
         stack.push_back(son);
@@ -110,7 +112,7 @@ std::string dot_from_re(std::unique_ptr<re::Re> regex, bool verbose) {
 
   out << "}\n";
   delete re;
-  
+
   return out.str();
 }
 
@@ -121,18 +123,20 @@ std::string dot_from_dfa(const dfa::Dfa& dfa) {
 
   for (size_t i = 0; i < dfa.nodes.size(); ++i) {
     auto& [node, terminal] = dfa.nodes[i];
-    
+
     std::unordered_map<int, std::set<int>> outmap;
 
     for (auto it = node.begin(); it != node.end(); ++it) {
       outmap[it->second].insert(it->first);
     }
 
-    for (auto& [out_idx, label_set]: outmap) {
+    for (auto& [out_idx, label_set] : outmap) {
       std::string label_str;
-      for (auto label: label_set) label_str += std::string(1, char(label)) + ",";
+      for (auto label : label_set)
+        label_str += std::string(1, char(label)) + ",";
       label_str.pop_back();
-      out << i << " -> " << out_idx << " [ label = \"" << label_str << "\" ];\n";
+      out << i << " -> " << out_idx << " [ label = \"" << label_str
+          << "\" ];\n";
     }
     if (terminal) {
       out << i << " [ shape = doublecircle, label = \"" << i << "\" ]\n";
@@ -144,35 +148,34 @@ std::string dot_from_dfa(const dfa::Dfa& dfa) {
   return out.str();
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   argparse::ArgumentParser parser("Dot Generator");
   parser.add_argument("-r", "--regex")
-    .required()
-    .help("regex with double quotes");
+      .required()
+      .help("regex with double quotes");
 
   parser.add_argument("-v", "--verbose")
-    .help("increase output verbosity")
-    .default_value(false)
-    .implicit_value(true);
+      .help("increase output verbosity")
+      .default_value(false)
+      .implicit_value(true);
 
   parser.add_argument("-t", "--type")
-    .help("generate type [ast, dfa] default: dfa")
-    .action([](const std::string& value) {
-    static const std::vector<std::string> choices = { "ast", "dfa" };
-    if (std::find(choices.begin(), choices.end(), value) != choices.end()) {
-      return value;
-    }
-    return std::string{ "dfa" };
-  });
+      .help("generate type [ast, dfa] default: dfa")
+      .default_value(std::string{"dfa"})
+      .action([](const std::string& value) {
+        static const std::vector<std::string> choices = {"ast", "dfa"};
+        if (std::find(choices.begin(), choices.end(), value) != choices.end()) {
+          return value;
+        }
+        return std::string{"dfa"};
+      });
 
   parser.add_argument("-o", "--output")
-    .help("speficy output file(*.dot) default: stdout");
-  
-  
+      .help("speficy output file(*.dot) default: stdout");
 
   try {
     parser.parse_args(argc, argv);
-  } catch (const std::runtime_error &err) {
+  } catch (const std::runtime_error& err) {
     std::cout << err.what() << std::endl;
     std::cout << parser;
     return 0;
@@ -191,7 +194,7 @@ int main(int argc, char *argv[]) {
     auto [re, _] = re::ReEngine::produce(regex);
     result = dot_from_re(std::move(re), verbose);
   }
-  
+
   if (auto output_file = parser.present("--output")) {
     std::ofstream out(*output_file, std::ios::out);
     out << result;
