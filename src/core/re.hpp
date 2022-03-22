@@ -10,14 +10,15 @@
 
 namespace parsergen::re {
 
+using intset_t = std::unordered_set<int>;
+
 struct Re {
   bool nullable;
-  std::unordered_set<int> firstpos;
-  std::unordered_set<int> lastpos;
+  intset_t firstpos;
+  intset_t lastpos;
 
-  virtual void traverse(
-      std::unordered_map<int, u8>& leafpos_map,
-      std::unordered_map<int, std::unordered_set<int>>& followpos) = 0;
+  virtual void traverse(std::unordered_map<int, u8>& leafpos_map,
+                        std::unordered_map<int, intset_t>& followpos) = 0;
   virtual Re* clone() = 0;
   virtual ~Re(){};
 };
@@ -29,7 +30,7 @@ struct Eps : Re {
     lastpos = {};
   }
   void traverse(std::unordered_map<int, u8>& leafpos_map,
-                std::unordered_map<int, std::unordered_set<int>>& followpos) {
+                std::unordered_map<int, intset_t>& followpos) {
     // done in initialization
     /*
     nullable = true;
@@ -50,7 +51,7 @@ struct Char : Re {
     lastpos = {leaf_count};
   }
   void traverse(std::unordered_map<int, u8>& leafpos_map,
-                std::unordered_map<int, std::unordered_set<int>>& followpos) {
+                std::unordered_map<int, intset_t>& followpos) {
     // partly done in initialization
     /*
     nullable = false;
@@ -67,7 +68,7 @@ struct Kleene : Re {
   Re* son;
   Kleene(Re* _son) : son(_son) {}
   void traverse(std::unordered_map<int, u8>& leafpos_map,
-                std::unordered_map<int, std::unordered_set<int>>& followpos) {
+                std::unordered_map<int, intset_t>& followpos) {
     son->traverse(leafpos_map, followpos);
     nullable = true;
     firstpos = son->firstpos;
@@ -99,7 +100,7 @@ struct Concat : Re {
     sons.clear();
   }
   void traverse(std::unordered_map<int, u8>& leafpos_map,
-                std::unordered_map<int, std::unordered_set<int>>& followpos) {
+                std::unordered_map<int, intset_t>& followpos) {
     nullable = true;
     bool stop = false;
     for (auto son : sons) {
@@ -120,7 +121,7 @@ struct Concat : Re {
     }
 
     // followpos
-    std::unordered_set<int> tmp_lastpos;
+    intset_t tmp_lastpos;
     for (int i = 0; i < int(sons.size()) - 1; ++i) {
       if (sons[i]->nullable)
         union_inplace(tmp_lastpos, sons[i]->lastpos);
@@ -149,7 +150,7 @@ struct Disjunction : Re {
     sons.clear();
   }
   void traverse(std::unordered_map<int, u8>& leafpos_map,
-                std::unordered_map<int, std::unordered_set<int>>& followpos) {
+                std::unordered_map<int, intset_t>& followpos) {
     nullable = false;
     for (auto son : sons) {
       son->traverse(leafpos_map, followpos);
