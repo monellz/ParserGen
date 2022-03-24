@@ -4,3 +4,4 @@ build
 
 *.dot
 env.sh
+*_old.*

@@ -15,6 +15,7 @@ if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 endif()
 
 include_directories(thirdparty)
+include_directories(include)
 file(GLOB_RECURSE source_files "src/core/*.hpp" "src/core/*.cpp")
 
 add_executable(dot_gen src/dot_gen.cpp ${source_files})

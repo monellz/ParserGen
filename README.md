@@ -15,8 +15,8 @@ Parser Generator
 ### dot_gen
 
 ```bash
-./dot_gen --help                                       
-Usage: Dot Generator [options] 
+./dot_gen --help
+Usage: Dot Generator [options]
 
 Optional arguments:
 -h --help       shows help message and exits

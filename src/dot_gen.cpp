@@ -4,8 +4,8 @@
 #include <string>
 
 #include "argparse.hpp"
-#include "core/dfa.hpp"
-#include "core/re.hpp"
+#include "core/dfa.h"
+#include "core/re.h"
 
 using namespace parsergen;
 
@@ -15,6 +15,7 @@ using namespace parsergen;
  */
 
 std::string dot_from_re(std::unique_ptr<re::Re> regex, bool verbose) {
+  /*
   std::ostringstream out;
   out << "digraph g{\n";
 
@@ -114,6 +115,7 @@ std::string dot_from_re(std::unique_ptr<re::Re> regex, bool verbose) {
   delete re;
 
   return out.str();
+  */
 }
 
 std::string dot_from_dfa(const dfa::Dfa& dfa) {
@@ -191,7 +193,8 @@ int main(int argc, char* argv[]) {
     auto [_, dfa] = dfa::DfaEngine::produce(regex);
     result = dot_from_dfa(dfa);
   } else if (type == "ast") {
-    auto [re, _] = re::ReEngine::produce(regex);
+    // auto [re, _] = re::ReEngine::produce(regex);
+    auto re = re::ReEngine::produce(regex);
     result = dot_from_re(std::move(re), verbose);
   }
 

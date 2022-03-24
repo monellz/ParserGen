@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+
 #include <string_view>
 #include <unordered_set>
 
@@ -7,7 +8,6 @@
 
 using namespace parsergen;
 
-
 TEST(basic_func, const_log2) {
   // EXPECT_EQ(LOG2(1), 1);
   EXPECT_EQ(LOG2(1), 0);
@@ -15,10 +15,10 @@ TEST(basic_func, const_log2) {
   EXPECT_EQ(LOG2(2), 1);
   EXPECT_EQ(LOG2(3), 2);
   EXPECT_EQ(LOG2(4), 2);
-  for (int i = 5; i <= 8; ++i)    EXPECT_EQ(LOG2(i), 3);
-  for (int i = 9; i <= 16; ++i)   EXPECT_EQ(LOG2(i), 4);
-  for (int i = 17; i <= 32; ++i)  EXPECT_EQ(LOG2(i), 5);
-  for (int i = 33; i <= 64; ++i)  EXPECT_EQ(LOG2(i), 6);
+  for (int i = 5; i <= 8; ++i) EXPECT_EQ(LOG2(i), 3);
+  for (int i = 9; i <= 16; ++i) EXPECT_EQ(LOG2(i), 4);
+  for (int i = 17; i <= 32; ++i) EXPECT_EQ(LOG2(i), 5);
+  for (int i = 33; i <= 64; ++i) EXPECT_EQ(LOG2(i), 6);
 }
 
 TEST(intset, attr) {
@@ -67,7 +67,6 @@ TEST(intset_32, op) {
     EXPECT_FALSE(s.check(i));
   }
 }
-
 
 TEST(intset_64, op) {
   IntSet<uint64_t> s(1000);

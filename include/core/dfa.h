@@ -1,9 +1,11 @@
-#pragma once
+#ifndef __DFA_H
+#define __DFA_H
 
 #include <vector>
 
-#include "common.hpp"
-#include "re.hpp"
+#include "core/common.h"
+#include "core/dfa.h"
+#include "core/re.h"
 
 namespace parsergen::dfa {
 
@@ -19,6 +21,7 @@ struct Dfa {
     assert(nodes.size() >= 1);
     u32 cur_idx = 0;
     bool cur_terminal = std::get<1>(nodes[0]);
+    /*
     for (auto c : sv) {
       const auto& [cur_node, _] = nodes[cur_idx];
       if (auto it = cur_node.find(c); it != cur_node.end()) {
@@ -29,6 +32,7 @@ struct Dfa {
         return false;
       }
     }
+    */
     return cur_terminal;
   }
 
@@ -89,14 +93,30 @@ class DfaEngine {
   std::unordered_map<int, std::unordered_set<int>> followpos;
 
  public:
-  DfaEngine(std::unique_ptr<re::Re> _re, int _leaf_count)
-      : leaf_count(_leaf_count) {
-    auto ex_re = new re::Concat();
-    ex_re->sons.push_back(_re.release());
-    ex_re->sons.push_back(new re::Char('\0', leaf_count++));
-    ex_re->traverse(leafpos_map, followpos);
+  DfaEngine(std::unique_ptr<re::Re> re) : leaf_count(0) {
+    auto ex_re = std::make_unique<re::Concat>();
+    ex_re->append(_re.release());
+    ex_re->append(new re::Char('\0'));
 
-    expand_re.reset(ex_re);
+    // traverse(ex_re, leafpos_map, followpos, leaf_count);
+
+    leaf_count = 0;
+    traverse(ex_re, [&](std::unique_ptr<Re>& _re) {
+      if (isa<Char>(_re)) {
+        cast<Char>(_re)->leaf_idx = leaf_count;
+        cast<Char>(_re)->nullable = false;
+        cast<Char>(_re)->firstpos = leaf_count;
+        leaf_count++;
+      } else if (isa<Eps>(_re)) {
+        cast<Eps>(_re)->nullable = true;
+      }
+    });
+    traverse(ex_re, [&](std::unique_ptr<Re>& _re) {
+      // switch
+      // leafpo
+    });
+
+    expand_re = std::move(ex_re);
 
     TERMINATION_INDEX = leaf_count - 1;
     assert(leafpos_map.at(TERMINATION_INDEX) == TERMINATION);
@@ -105,6 +125,7 @@ class DfaEngine {
   Dfa produce() {
     states.clear();
     Dfa dfa;
+    /*
 
     size_t label_idx = 0;
     states.push_back(expand_re->firstpos);
@@ -137,13 +158,14 @@ class DfaEngine {
     for (auto& [node, _] : dfa.nodes) {
       node.erase(TERMINATION);
     }
+    */
 
     return dfa;
   }
 
   static std::tuple<DfaEngine, Dfa> produce(std::string_view sv) {
-    auto [re, leaf_count] = re::ReEngine::produce(sv);
-    DfaEngine engine(std::move(re), leaf_count);
+    auto re = re::ReEngine::produce(sv);
+    DfaEngine engine(std::move(re));
     auto dfa = engine.produce();
     dfa.minimize();
     return std::make_tuple(std::move(engine), std::move(dfa));
@@ -151,3 +173,5 @@ class DfaEngine {
 };
 
 }  // namespace parsergen::dfa
+
+#endif
