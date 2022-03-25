@@ -114,17 +114,13 @@ std::unique_ptr<Re> ReEngine::parse_brackets(std::string_view sv) {
       case ')':
       case '[':
       case ']':
-      case '.':
       case '|':
-      case '*':
-      case '+':
-      case '?':
       case '{':
       case '}':
       case '^':
       case '$': {
         ERR_EXIT(original_sv, sv[0],
-                 "not support unescaped metachar in brackets");
+                 "not support some unescaped metachars in brackets");
       }
       case '\\': {
         UNREACHABLE();
@@ -135,8 +131,8 @@ std::unique_ptr<Re> ReEngine::parse_brackets(std::string_view sv) {
         break;
       }
       default: {
-        if (sv.size() >= 3 && sv[1] == '-' && std::isalnum(sv[2]) &&
-            sv[0] <= sv[2]) {
+        if (sv.size() >= 3 && sv[1] == '-' && std::isalnum(sv[0]) &&
+            std::isalnum(sv[2]) && sv[0] <= sv[2]) {
           // look ahead to check '-'
           for (int i = sv[0]; i <= sv[2]; ++i) update(i);
           sv.remove_prefix(3);

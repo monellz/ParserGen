@@ -75,15 +75,25 @@ TEST(number, integer) {
 }
 
 TEST(number, floating) {
-  auto [_, float_dfa] = DfaEngine::produce(R"([-\+]?[0-9]*\.?[0-9]+)");
+  auto [_, float_dfa] =
+      DfaEngine::produce(R"([-+]?[0-9]*[.][0-9]*([eE][-+]?[0-9]+)?)");
   EXPECT_TRUE(float_dfa.accept("1.123120220"));
   EXPECT_TRUE(float_dfa.accept("-0.0220"));
   EXPECT_TRUE(float_dfa.accept("-0.0"));
-  EXPECT_TRUE(float_dfa.accept("+0"));
+  EXPECT_TRUE(float_dfa.accept("+0.123123"));
   EXPECT_TRUE(float_dfa.accept("0.2391"));
   EXPECT_TRUE(float_dfa.accept("12312312324238283.1"));
   EXPECT_TRUE(float_dfa.accept("12312312324238283.10100"));
-  EXPECT_TRUE(float_dfa.accept("12312312324238283"));
+  EXPECT_TRUE(float_dfa.accept("-.123123"));
+  EXPECT_TRUE(float_dfa.accept("-.1231e1234"));
+  EXPECT_TRUE(float_dfa.accept("-0.1231e1234"));
+  EXPECT_TRUE(float_dfa.accept("0.1231e1234"));
+  EXPECT_TRUE(float_dfa.accept("-.1231E1234"));
+  EXPECT_TRUE(float_dfa.accept("-.1231E+1234"));
+  EXPECT_TRUE(float_dfa.accept("-.1231E-1234"));
+  EXPECT_TRUE(float_dfa.accept("+.1231E-1234"));
+
+  EXPECT_FALSE(float_dfa.accept("12312312324238283"));
 }
 
 TEST(real_case, const_integer) {
