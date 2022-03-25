@@ -5,6 +5,7 @@
 
 #include "argparse.hpp"
 #include "core/dfa.h"
+#include "core/nfa.h"
 #include "core/re.h"
 
 using namespace parsergen;
@@ -140,7 +141,56 @@ std::string dot_from_dfa(const dfa::Dfa& dfa) {
           << "\" ];\n";
     }
     if (terminal) {
-      out << i << " [ shape = doublecircle, label = \"" << i << "\" ]\n";
+      out << i << " [ shape = doublecircle, label = \"" << i
+          << " (id: " << terminal.value() << ")"
+          << "\" ]\n";
+    } else {
+      out << i << " [ shape = circle, label = \"" << i << "\" ]\n";
+    }
+  }
+  out << "}\n";
+  return out.str();
+}
+
+std::string dot_from_nfa(const nfa::Nfa& nfa) {
+  std::ostringstream out;
+  out << "digraph g{\n";
+  out << "rankdir = \"LR\"\n";
+
+  for (size_t i = 0; i < nfa.nodes.size(); ++i) {
+    auto& terminal = nfa.nodes[i].terminal_id;
+    auto& eps_edges = nfa.nodes[i].eps_edges;
+    auto& edges = nfa.nodes[i].edges;
+
+    // -1 means eps
+    const int EPS = -1;
+    std::unordered_map<int, std::set<int>> outmap;
+    for (auto& [k, v] : edges) {
+      for (auto out_idx : v) {
+        outmap[out_idx].insert(k);
+      }
+    }
+    for (auto out_idx : eps_edges) {
+      outmap[out_idx].insert(EPS);
+    }
+
+    for (auto& [out_idx, label_set] : outmap) {
+      std::string label_str;
+      for (auto label : label_set) {
+        if (label == EPS) {
+          label_str += "eps,";
+        } else {
+          label_str += std::string(1, char(label)) + ",";
+        }
+      }
+      label_str.pop_back();
+      out << i << " -> " << out_idx << " [ label = \"" << label_str
+          << "\" ];\n";
+    }
+    if (terminal) {
+      out << i << " [ shape = doublecircle, label = \"" << i
+          << " (id: " << terminal.value() << ")"
+          << "\" ]\n";
     } else {
       out << i << " [ shape = circle, label = \"" << i << "\" ]\n";
     }
@@ -161,10 +211,10 @@ int main(int argc, char* argv[]) {
       .implicit_value(true);
 
   parser.add_argument("-t", "--type")
-      .help("generate type [ast, dfa] default: dfa")
+      .help("generate type [ast, dfa, nfa] default: dfa")
       .default_value(std::string{"dfa"})
       .action([](const std::string& value) {
-        static const std::vector<std::string> choices = {"ast", "dfa"};
+        static const std::vector<std::string> choices = {"ast", "dfa", "nfa"};
         if (std::find(choices.begin(), choices.end(), value) != choices.end()) {
           return value;
         }
@@ -188,7 +238,11 @@ int main(int argc, char* argv[]) {
 
   std::string result;
 
-  if (type == "dfa") {
+  if (type == "nfa") {
+    auto re = re::ReEngine::produce(regex);
+    auto nfa = nfa::Nfa::from_re(re);
+    result = dot_from_nfa(nfa);
+  } else if (type == "dfa") {
     auto [_, dfa] = dfa::DfaEngine::produce(regex);
     result = dot_from_dfa(dfa);
   } else if (type == "ast") {

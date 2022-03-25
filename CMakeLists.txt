@@ -20,8 +20,9 @@ file(GLOB_RECURSE source_files "src/core/*.hpp" "src/core/*.cpp")
 
 add_executable(dot_gen
   src/dot_gen.cpp
-  src/core/dfa.cpp
   src/core/re.cpp
+  src/core/dfa.cpp
+  src/core/nfa.cpp
 )
 
 
