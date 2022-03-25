@@ -4,7 +4,7 @@
 #include <unordered_set>
 
 //#define DBG_MACRO_DISABLE
-#include "common.hpp"
+#include "core/common.h"
 
 using namespace parsergen;
 

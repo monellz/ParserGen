@@ -4,10 +4,9 @@
 #include <unordered_set>
 
 //#define DBG_MACRO_DISABLE
-#include "dfa.hpp"
+#include "core/dfa.h"
 
 using namespace parsergen::dfa;
-using namespace parsergen::err;
 
 TEST(set, set_cmp) {
   std::unordered_set<int> a = {1, 2, 3};

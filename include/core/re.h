@@ -35,14 +35,16 @@ class Re {
   intset_t firstpos;
   intset_t lastpos;
   explicit Re(ReKind kind) : kind(kind) {}
-  Re* clone() const;
+  std::unique_ptr<Re> clone() const;
+  virtual ~Re() {}
 };
 
 class Eps : public Re {
  public:
   explicit Eps() : Re(ReKind::kEps) {}
   static bool classof(const Re* base) { return base->kind == ReKind::kEps; }
-  Eps* clone_impl() const { return new Eps(); }
+  std::unique_ptr<Eps> clone_impl() const { return std::make_unique<Eps>(); }
+  virtual ~Eps() override {}
 };
 
 class Char : public Re {
@@ -51,16 +53,22 @@ class Char : public Re {
   int leaf_idx;
   explicit Char(char c) : Re(ReKind::kChar), c(c) {}
   static bool classof(const Re* base) { return base->kind == ReKind::kChar; }
-  Char* clone_impl() const { return new Char(c); }
+  std::unique_ptr<Char> clone_impl() const { return std::make_unique<Char>(c); }
+  virtual ~Char() override {}
 };
 
 class Kleene : public Re {
  public:
   std::unique_ptr<Re> son;
-  explicit Kleene(Re* son) : Re(ReKind::kKleene), son(son) {}
+  explicit Kleene(std::unique_ptr<Re> son)
+      : Re(ReKind::kKleene), son(std::move(son)) {}
   static bool classof(const Re* base) { return base->kind == ReKind::kKleene; }
 
-  Kleene* clone_impl() const { return new Kleene(son->clone()); }
+  std::unique_ptr<Kleene> clone_impl() const {
+    auto son_cloned = son->clone();
+    return std::make_unique<Kleene>(std::move(son_cloned));
+  }
+  virtual ~Kleene() override {}
 };
 
 class Concat : public Re {
@@ -69,15 +77,15 @@ class Concat : public Re {
   explicit Concat() : Re(ReKind::kConcat) {}
   static bool classof(const Re* base) { return base->kind == ReKind::kConcat; }
 
-  inline void append(Re* _re) { sons.push_back(std::unique_ptr<Re>(_re)); }
-
-  Concat* clone_impl() const {
-    Concat* new_concat = new Concat();
+  std::unique_ptr<Concat> clone_impl() const {
+    auto new_concat = std::make_unique<Concat>();
     for (auto& son : sons) {
-      new_concat->append(son->clone());
+      auto son_cloned = son->clone();
+      new_concat->sons.push_back(std::move(son_cloned));
     }
     return new_concat;
   }
+  virtual ~Concat() override {}
 };
 
 class Disjunction : public Re {
@@ -87,14 +95,15 @@ class Disjunction : public Re {
   static bool classof(const Re* base) {
     return base->kind == ReKind::kDisjunction;
   }
-  inline void append(Re* _re) { sons.push_back(std::unique_ptr<Re>(_re)); }
-  Disjunction* clone_impl() const {
-    Disjunction* new_dis = new Disjunction();
+  std::unique_ptr<Disjunction> clone_impl() const {
+    auto new_dis = std::make_unique<Disjunction>();
     for (auto& son : sons) {
-      new_dis->append(son->clone());
+      auto son_cloned = son->clone();
+      new_dis->sons.push_back(std::move(son_cloned));
     }
     return new_dis;
   }
+  virtual ~Disjunction() override {}
 };
 
 class ReEngine {

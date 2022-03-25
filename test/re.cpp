@@ -1,30 +1,29 @@
 #include <gtest/gtest.h>
 
+#include <set>
 #include <string_view>
 #include <unordered_set>
 
-#define DBG_MACRO_DISABLE
-#include "re.hpp"
+//#define DBG_MACRO_DISABLE
+#include "core/re.h"
+#include "util/casting.h"
 
+using namespace parsergen;
 using namespace parsergen::re;
-using namespace parsergen::err;
 
 TEST(basic, single_word_char) {
-  std::unordered_set<std::string> words;
+  std::set<std::string> words;
   for (char c = 'a'; c != 'z'; ++c) words.insert(std::string(1, c));
   for (char c = 'A'; c != 'Z'; ++c) words.insert(std::string(1, c));
   for (char c = '0'; c != '9'; ++c) words.insert(std::string(1, c));
 
   for (auto c : words) {
-    auto [ptr, leaf_count] = ReEngine::produce(c);
-    EXPECT_EQ(leaf_count, 1);
-    auto res = ptr.release();
-    ASSERT_NE(dynamic_cast<Concat*>(res), nullptr);
-    auto concat = dynamic_cast<Concat*>(res);
-    ASSERT_NE(dynamic_cast<Char*>(concat->sons[0]), nullptr);
-    auto son = dynamic_cast<Char*>(concat->sons[0]);
+    auto ptr = ReEngine::produce(c);
+    EXPECT_TRUE(isa<Concat>(ptr));
+    auto concat = static_cast<Concat*>(ptr.get());
+    EXPECT_TRUE(isa<Char>(concat->sons[0]));
+    auto son = static_cast<Char*>(concat->sons[0].get());
     EXPECT_EQ(son->c, c[0]);
-    delete res;
   }
 }
 

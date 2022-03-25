@@ -21,7 +21,6 @@ struct Dfa {
     assert(nodes.size() >= 1);
     u32 cur_idx = 0;
     bool cur_terminal = std::get<1>(nodes[0]);
-    /*
     for (auto c : sv) {
       const auto& [cur_node, _] = nodes[cur_idx];
       if (auto it = cur_node.find(c); it != cur_node.end()) {
@@ -32,7 +31,6 @@ struct Dfa {
         return false;
       }
     }
-    */
     return cur_terminal;
   }
 
@@ -93,30 +91,122 @@ class DfaEngine {
   std::unordered_map<int, std::unordered_set<int>> followpos;
 
  public:
-  DfaEngine(std::unique_ptr<re::Re> re) : leaf_count(0) {
-    auto ex_re = std::make_unique<re::Concat>();
-    ex_re->append(_re.release());
-    ex_re->append(new re::Char('\0'));
-
-    // traverse(ex_re, leafpos_map, followpos, leaf_count);
-
-    leaf_count = 0;
-    traverse(ex_re, [&](std::unique_ptr<Re>& _re) {
-      if (isa<Char>(_re)) {
-        cast<Char>(_re)->leaf_idx = leaf_count;
-        cast<Char>(_re)->nullable = false;
-        cast<Char>(_re)->firstpos = leaf_count;
-        leaf_count++;
-      } else if (isa<Eps>(_re)) {
-        cast<Eps>(_re)->nullable = true;
+  void dfs(std::unique_ptr<re::Re>& re,
+           std::function<void(std::unique_ptr<re::Re>&)> fn) {
+    switch (re->kind) {
+      case re::Re::kChar:
+      case re::Re::kEps:
+        break;
+      case re::Re::kKleene: {
+        auto s = static_cast<re::Kleene*>(re.get());
+        dfs(s->son, fn);
+        break;
       }
-    });
-    traverse(ex_re, [&](std::unique_ptr<Re>& _re) {
-      // switch
-      // leafpo
-    });
+      case re::Re::kConcat: {
+        auto c = static_cast<re::Concat*>(re.get());
+        for (auto& s : c->sons) {
+          dfs(s, fn);
+        }
+        break;
+      }
+      case re::Re::kDisjunction: {
+        auto dis = static_cast<re::Disjunction*>(re.get());
+        for (auto& s : dis->sons) {
+          dfs(s, fn);
+        }
+        break;
+      }
+      default:
+        UNREACHABLE();
+    }
+    fn(re);
+  }
+  DfaEngine(std::unique_ptr<re::Re> re) {
+    auto ex_re = std::make_unique<re::Concat>();
+    ex_re->sons.push_back(std::move(re));
+    ex_re->sons.push_back(std::make_unique<re::Char>('\0'));
 
     expand_re = std::move(ex_re);
+
+    leaf_count = 0;
+    dfs(expand_re, [&](std::unique_ptr<re::Re>& _re) {
+      // switch
+      // leafpo
+      switch (_re->kind) {
+        case re::Re::kChar: {
+          auto char_re = static_cast<re::Char*>(_re.get());
+          char_re->leaf_idx = leaf_count;
+          char_re->nullable = false;
+          char_re->firstpos = {leaf_count};
+          char_re->lastpos = {leaf_count};
+          leafpos_map[leaf_count] = char_re->c;
+          leaf_count++;
+          break;
+        }
+        case re::Re::kEps: {
+          auto eps_re = static_cast<re::Eps*>(_re.get());
+          eps_re->nullable = true;
+          break;
+        }
+        case re::Re::kKleene: {
+          auto k_re = static_cast<re::Kleene*>(_re.get());
+          k_re->nullable = true;
+          k_re->firstpos = k_re->son->firstpos;
+          k_re->lastpos = k_re->son->lastpos;
+
+          for (auto pos : k_re->lastpos) {
+            union_inplace(this->followpos[pos], k_re->firstpos);
+          }
+          break;
+        }
+        case re::Re::kConcat: {
+          auto con_re = static_cast<re::Concat*>(_re.get());
+          con_re->nullable = true;
+          bool stop = false;
+          for (auto& son : con_re->sons) {
+            con_re->nullable = con_re->nullable && son->nullable;
+            if (!stop) {
+              union_inplace(con_re->firstpos, son->firstpos);
+              if (!son->nullable) stop = true;
+            }
+          }
+
+          stop = false;
+          for (auto it = con_re->sons.rbegin(); it != con_re->sons.rend();
+               ++it) {
+            if (!stop) {
+              union_inplace(con_re->lastpos, (*it)->lastpos);
+              if (!(*it)->nullable) stop = true;
+            }
+          }
+
+          // followpos
+          std::unordered_set<int> tmp_lastpos;
+          for (int i = 0; i < (int)con_re->sons.size() - 1; ++i) {
+            if (con_re->sons[i]->nullable) {
+              union_inplace(tmp_lastpos, con_re->sons[i]->lastpos);
+            } else {
+              tmp_lastpos = con_re->sons[i]->lastpos;
+            }
+            for (auto pos : tmp_lastpos) {
+              union_inplace(followpos[pos], con_re->sons[i + 1]->firstpos);
+            }
+          }
+          break;
+        }
+        case re::Re::kDisjunction: {
+          auto dis_re = static_cast<re::Disjunction*>(_re.get());
+          for (auto& son : dis_re->sons) {
+            dis_re->nullable = dis_re->nullable || son->nullable;
+            union_inplace(dis_re->firstpos, son->firstpos);
+            union_inplace(dis_re->lastpos, son->lastpos);
+          }
+          break;
+        }
+        default:
+          UNREACHABLE();
+      }
+    });
 
     TERMINATION_INDEX = leaf_count - 1;
     assert(leafpos_map.at(TERMINATION_INDEX) == TERMINATION);
@@ -125,7 +215,6 @@ class DfaEngine {
   Dfa produce() {
     states.clear();
     Dfa dfa;
-    /*
 
     size_t label_idx = 0;
     states.push_back(expand_re->firstpos);
@@ -158,7 +247,6 @@ class DfaEngine {
     for (auto& [node, _] : dfa.nodes) {
       node.erase(TERMINATION);
     }
-    */
 
     return dfa;
   }

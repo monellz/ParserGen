@@ -3,5 +3,6 @@
 build
 
 *.dot
+*.png
 env.sh
 *_old.*

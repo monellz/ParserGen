@@ -2,8 +2,8 @@
 
 namespace parsergen::re {
 
-Re* Re::clone() const {
-  Re* new_re = nullptr;
+std::unique_ptr<Re> Re::clone() const {
+  std::unique_ptr<Re> new_re;
   switch (kind) {
     default:
       UNREACHABLE();
@@ -135,10 +135,10 @@ std::unique_ptr<Re> ReEngine::parse_brackets(std::string_view sv) {
         break;
       }
       default: {
-        if (sv.size() >= 3 && sv[1] == '-' && std::isalpha(sv[2]) &&
+        if (sv.size() >= 3 && sv[1] == '-' && std::isalnum(sv[2]) &&
             sv[0] <= sv[2]) {
           // look ahead to check '-'
-          for (int i = sv[0]; i < sv[2]; ++i) update(i);
+          for (int i = sv[0]; i <= sv[2]; ++i) update(i);
           sv.remove_prefix(3);
         } else {
           update(sv[0]);
@@ -151,7 +151,7 @@ std::unique_ptr<Re> ReEngine::parse_brackets(std::string_view sv) {
 
   auto final_dis = std::make_unique<Disjunction>();
   for (auto c : hs) {
-    final_dis->append(new Char(c));
+    final_dis->sons.push_back(std::make_unique<Char>(c));
   }
 
   return final_dis;
@@ -182,7 +182,9 @@ std::unique_ptr<Re> ReEngine::parse_without_pipe(std::string_view sv) {
 
       auto chars = _expand_metachar(sv.substr(0, 2));
       auto d = std::make_unique<Disjunction>();
-      for (auto c : chars) d->append(new Char(c));
+      for (auto c : chars) {
+        d->sons.push_back(std::make_unique<Char>(c));
+      }
       stack.push_back(std::move(d));
       sv.remove_prefix(2);
       continue;
@@ -198,20 +200,20 @@ std::unique_ptr<Re> ReEngine::parse_without_pipe(std::string_view sv) {
       }
       case '*': {
         if (stack.empty()) ERR_EXIT(original_sv, "empty kleene");
-        Re* bk = stack.back().release();
+        std::unique_ptr<Re> bk = std::move(stack.back());
         stack.pop_back();
-        auto k = std::make_unique<Kleene>(bk);
+        auto k = std::make_unique<Kleene>(std::move(bk));
         stack.push_back(std::move(k));
         sv.remove_prefix(1);
         break;
       }
       case '?': {
         if (stack.empty()) ERR_EXIT(original_sv, "empty question mark");
-        Re* bk = stack.back().release();
+        std::unique_ptr<Re> bk = std::move(stack.back());
         stack.pop_back();
         auto k = std::make_unique<Disjunction>();
-        k->append(bk);
-        k->append(new Eps());
+        k->sons.push_back(std::move(bk));
+        k->sons.push_back(std::make_unique<Eps>());
         stack.push_back(std::move(k));
         sv.remove_prefix(1);
         break;
@@ -219,7 +221,7 @@ std::unique_ptr<Re> ReEngine::parse_without_pipe(std::string_view sv) {
       case '.': {
         auto d = std::make_unique<Disjunction>();
         for (int i = 0; i < 256; ++i) {
-          d->append(new Char(i));
+          d->sons.push_back(std::make_unique<Char>(i));
         }
         sv.remove_prefix(1);
         break;
@@ -277,7 +279,6 @@ std::unique_ptr<Re> ReEngine::parse(std::string_view sv) {
   if (output.size() == 1) return parse_without_pipe(output[0]);
 
   auto dis = std::make_unique<Disjunction>();
-  dis->sons.reserve(output.size());
   for (auto s : output) {
     assert(!s.empty());
     auto one = parse_without_pipe(s);
