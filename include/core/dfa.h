@@ -97,36 +97,6 @@ class DfaEngine {
   std::unordered_map<int, std::unordered_set<int>> followpos;
 
  public:
-  void dfs(std::unique_ptr<re::Re>& re,
-           std::function<void(std::unique_ptr<re::Re>&)> fn) {
-    switch (re->kind) {
-      case re::Re::kChar:
-      case re::Re::kEps:
-        break;
-      case re::Re::kKleene: {
-        auto s = static_cast<re::Kleene*>(re.get());
-        dfs(s->son, fn);
-        break;
-      }
-      case re::Re::kConcat: {
-        auto c = static_cast<re::Concat*>(re.get());
-        for (auto& s : c->sons) {
-          dfs(s, fn);
-        }
-        break;
-      }
-      case re::Re::kDisjunction: {
-        auto dis = static_cast<re::Disjunction*>(re.get());
-        for (auto& s : dis->sons) {
-          dfs(s, fn);
-        }
-        break;
-      }
-      default:
-        UNREACHABLE();
-    }
-    fn(re);
-  }
   DfaEngine(std::unique_ptr<re::Re> re, u32 id = 0) : id(id) {
     auto ex_re = std::make_unique<re::Concat>();
     ex_re->sons.push_back(std::move(re));
@@ -135,7 +105,7 @@ class DfaEngine {
     expand_re = std::move(ex_re);
 
     leaf_count = 0;
-    dfs(expand_re, [&](std::unique_ptr<re::Re>& _re) {
+    re::dfs(expand_re, [&](std::unique_ptr<re::Re>& _re) {
       // switch
       // leafpo
       switch (_re->kind) {

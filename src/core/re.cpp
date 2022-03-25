@@ -284,4 +284,35 @@ std::unique_ptr<Re> ReEngine::parse(std::string_view sv) {
   return dis;
 }
 
+void dfs(std::unique_ptr<Re>& re,
+         std::function<void(std::unique_ptr<re::Re>&)> fn) {
+  switch (re->kind) {
+    case re::Re::kChar:
+    case re::Re::kEps:
+      break;
+    case re::Re::kKleene: {
+      auto s = static_cast<re::Kleene*>(re.get());
+      dfs(s->son, fn);
+      break;
+    }
+    case re::Re::kConcat: {
+      auto c = static_cast<re::Concat*>(re.get());
+      for (auto& s : c->sons) {
+        dfs(s, fn);
+      }
+      break;
+    }
+    case re::Re::kDisjunction: {
+      auto dis = static_cast<re::Disjunction*>(re.get());
+      for (auto& s : dis->sons) {
+        dfs(s, fn);
+      }
+      break;
+    }
+    default:
+      UNREACHABLE();
+  }
+  fn(re);
+}
+
 }  // namespace parsergen::re

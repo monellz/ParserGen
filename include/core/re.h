@@ -121,6 +121,9 @@ class ReEngine {
   std::unordered_set<char> _expand_metachar(std::string_view sv);
 };
 
+void dfs(std::unique_ptr<Re>& re,
+         std::function<void(std::unique_ptr<re::Re>&)> fn);
+
 }  // namespace parsergen::re
 
 #endif
