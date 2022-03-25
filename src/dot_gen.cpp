@@ -123,7 +123,7 @@ std::string dot_from_dfa(const dfa::Dfa& dfa) {
   out << "rankdir = \"LR\"\n";
 
   for (size_t i = 0; i < dfa.nodes.size(); ++i) {
-    auto& [node, terminal] = dfa.nodes[i];
+    auto& [terminal, node] = dfa.nodes[i];
 
     std::unordered_map<int, std::set<int>> outmap;
 

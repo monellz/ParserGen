@@ -1,6 +1,8 @@
 #ifndef __DFA_H
 #define __DFA_H
 
+#include <optional>
+#include <utility>
 #include <vector>
 
 #include "core/common.h"
@@ -9,34 +11,37 @@
 
 namespace parsergen::dfa {
 
-using DfaNode = std::unordered_map<u8, u32>;
+using DfaNode = std::pair<std::optional<u32>, std::unordered_map<u8, u32>>;
 
 struct Dfa {
-  std::vector<std::tuple<DfaNode, bool>> nodes;
+  std::vector<DfaNode> nodes;
   Dfa() {}
   Dfa(const Dfa& d) : nodes(d.nodes) {}
   Dfa(Dfa&& d) : nodes(std::move(d.nodes)) {}
 
-  bool accept(std::string_view sv) {
+  // if ret_val.has_value() / if (ret_val) it is accepted
+  std::optional<u32> accept(std::string_view sv) {
     assert(nodes.size() >= 1);
     u32 cur_idx = 0;
-    bool cur_terminal = std::get<1>(nodes[0]);
+    auto terminal = std::get<0>(nodes[0]);
     for (auto c : sv) {
-      const auto& [cur_node, _] = nodes[cur_idx];
-      if (auto it = cur_node.find(c); it != cur_node.end()) {
+      const auto& cur_node = nodes[cur_idx];
+      const auto& edges = std::get<1>(cur_node);
+      if (auto it = edges.find(c); it != edges.end()) {
         // found corresponding edge
         cur_idx = it->second;
-        cur_terminal = std::get<1>(nodes[cur_idx]);
+        terminal = std::get<0>(nodes[cur_idx]);
       } else {
-        return false;
+        return std::nullopt;
       }
     }
-    return cur_terminal;
+    return terminal;
   }
 
   void minimize() {
     // now only remove dead state
     // TODO: more efficient
+    /*
     std::vector<bool> visit(nodes.size(), false);
     std::vector<int> stack;
     stack.reserve(nodes.size());
@@ -58,7 +63,7 @@ struct Dfa {
       }
     }
 
-    std::vector<std::tuple<DfaNode, bool>> new_nodes(alive_num);
+    std::vector<DfaNode> new_nodes(alive_num);
 
     for (size_t i = 0; i < visit.size(); ++i) {
       if (visit[i]) {
@@ -73,11 +78,13 @@ struct Dfa {
     }
 
     nodes = std::move(new_nodes);
+    */
   }
 };
 
 class DfaEngine {
  private:
+  u32 id;
   std::unique_ptr<re::Re> expand_re;
 
   std::vector<std::unordered_set<int>> states;
@@ -121,7 +128,7 @@ class DfaEngine {
     }
     fn(re);
   }
-  DfaEngine(std::unique_ptr<re::Re> re) {
+  DfaEngine(std::unique_ptr<re::Re> re, u32 id = 0) : id(id) {
     auto ex_re = std::make_unique<re::Concat>();
     ex_re->sons.push_back(std::move(re));
     ex_re->sons.push_back(std::make_unique<re::Char>('\0'));
@@ -227,9 +234,14 @@ class DfaEngine {
     };
     while (label_idx < states.size()) {
       const auto& s = states[label_idx];
-      bool is_terminal = (s.find(TERMINATION_INDEX) != s.end());
-      dfa.nodes.push_back(std::make_tuple(DfaNode(), is_terminal));
-      auto& [cur, _] = dfa.nodes[label_idx];
+      std::optional<u32> is_terminal;
+      if (s.find(TERMINATION_INDEX) != s.end()) {
+        is_terminal = this->id;
+      }
+      DfaNode tmp_node;
+      std::get<0>(tmp_node) = is_terminal;
+      dfa.nodes.push_back(std::move(tmp_node));
+      auto& [_, cur] = dfa.nodes[label_idx];
       std::unordered_map<u8, std::unordered_set<int>> u;
       for (auto pos : s) u[leafpos_map.at(pos)].insert(pos);
       for (auto& [c, pos_set] : u) {
@@ -244,16 +256,16 @@ class DfaEngine {
     }
 
     // clean TERMINATION
-    for (auto& [node, _] : dfa.nodes) {
+    for (auto& [_, node] : dfa.nodes) {
       node.erase(TERMINATION);
     }
 
     return dfa;
   }
 
-  static std::tuple<DfaEngine, Dfa> produce(std::string_view sv) {
+  static std::tuple<DfaEngine, Dfa> produce(std::string_view sv, u32 id = 0) {
     auto re = re::ReEngine::produce(sv);
-    DfaEngine engine(std::move(re));
+    DfaEngine engine(std::move(re), id);
     auto dfa = engine.produce();
     dfa.minimize();
     return std::make_tuple(std::move(engine), std::move(dfa));
