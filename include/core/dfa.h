@@ -15,7 +15,7 @@ using DfaNode = std::pair<std::optional<u32>, std::unordered_map<u8, u32>>;
 
 struct Dfa {
   std::vector<DfaNode> nodes;
-  Dfa() {}
+  explicit Dfa(std::vector<DfaNode> nodes) : nodes(std::move(nodes)) {}
   Dfa(const Dfa& d) : nodes(d.nodes) {}
   Dfa(Dfa&& d) : nodes(std::move(d.nodes)) {}
 
@@ -221,7 +221,7 @@ class DfaEngine {
 
   Dfa produce() {
     states.clear();
-    Dfa dfa;
+    std::vector<DfaNode> dfa_nodes;
 
     size_t label_idx = 0;
     states.push_back(expand_re->firstpos);
@@ -240,8 +240,8 @@ class DfaEngine {
       }
       DfaNode tmp_node;
       std::get<0>(tmp_node) = is_terminal;
-      dfa.nodes.push_back(std::move(tmp_node));
-      auto& [_, cur] = dfa.nodes[label_idx];
+      dfa_nodes.push_back(std::move(tmp_node));
+      auto& [_, cur] = dfa_nodes[label_idx];
       std::unordered_map<u8, std::unordered_set<int>> u;
       for (auto pos : s) u[leafpos_map.at(pos)].insert(pos);
       for (auto& [c, pos_set] : u) {
@@ -256,11 +256,11 @@ class DfaEngine {
     }
 
     // clean TERMINATION
-    for (auto& [_, node] : dfa.nodes) {
+    for (auto& [_, node] : dfa_nodes) {
       node.erase(TERMINATION);
     }
 
-    return dfa;
+    return Dfa(std::move(dfa_nodes));
   }
 
   static std::tuple<DfaEngine, Dfa> produce(std::string_view sv, u32 id = 0) {
