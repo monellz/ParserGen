@@ -2,6 +2,11 @@
 
 namespace parsergen::nfa {
 
+Nfa Nfa::from_sv(std::string_view sv, u32 id) {
+  auto re = re::Re::parse(sv);
+  return from_re(std::move(re), id);
+}
+
 // "Compilers: Principles, Techniques and Tools" Algorithm 3.23
 Nfa Nfa::from_re(std::unique_ptr<re::Re>&& re, u32 id) {
   // TODO: more efficiency
@@ -75,17 +80,20 @@ Nfa Nfa::from_re(std::unique_ptr<re::Re>&& re, u32 id) {
           // move edges to the end node of previous son
           // fix index in son nodes
           for (auto& son_node : son) son_node.move_offset(start_node_idx);
-          nodes[start_node_idx].eps_edges = std::move(son[0].eps_edges);
-          nodes[start_node_idx].edges = std::move(son[0].edges);
+          // merge
+          // WARNING: may need union
+          for (auto e : son[0].eps_edges)
+            nodes[start_node_idx].eps_edges.push_back(e);
+          for (auto& [k, v] : son[0].edges) {
+            for (auto vi : v) nodes[start_node_idx].edges[k].push_back(vi);
+          }
           // push other nodes of son
           for (u32 j = 1; j < son_node_size; ++j)
             nodes.push_back(std::move(son[j]));
-          assert(nodes.back().terminal_id);
-          nodes.back().terminal_id = std::nullopt;
-
           start_node_idx += son_node_size - 1;
         }
         assert(nodes.size() - 1 == start_node_idx);
+        assert(nodes[start_node_idx].terminal_id);
         nodes.back().terminal_id = id;
         break;
       }

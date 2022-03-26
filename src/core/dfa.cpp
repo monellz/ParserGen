@@ -43,8 +43,224 @@ void bfs(Dfa& dfa, std::function<void(u32, DfaNode&)> fn) {
   }
 }
 
+// "Compilers: Principles, Techniques and Tools" Algorithm 3.39
+template <int DFA_STATE_NUM>
+static void minimize_impl(Dfa& dfa) {
+  // the extra is the dead state
+  using bitset = std::bitset<DFA_STATE_NUM + 1>;
+  std::unordered_set<bitset> partition;
+
+  // init partition
+  constexpr u32 DEAD_STATE_IDX = DFA_STATE_NUM;
+  std::unordered_map<u32, bitset> terminal_states;
+  bitset nonterm_states;
+  bitset dead_states;
+  dead_states.set(DEAD_STATE_IDX);
+  for (u32 i = 0; i < (u32)dfa.nodes.size(); ++i) {
+    auto& [terminal, next] = dfa.nodes[i];
+    if (terminal) {
+      terminal_states[terminal.value()].set(i);
+    } else {
+      nonterm_states.set(i);
+    }
+  }
+  // add into partition
+  for (auto& [_, bs] : terminal_states) {
+    partition.insert(bs);
+  }
+  if (nonterm_states.count() > 0) partition.insert(nonterm_states);
+  partition.insert(dead_states);
+
+  // start minimize
+  std::unordered_set<bitset> new_partition = partition;
+  while (true) {
+    bool changed = false;
+    for (auto& bs : partition) {
+      if (bs.count() <= 1) {
+        continue;
+      }
+
+      // try partition
+      for (int a = 0; a < 256; ++a) {
+        std::unordered_map<u32, std::unordered_set<u32>> map;
+        std::unordered_set<u32> dst_set;
+        bitset dst_bs;
+        for (u32 state_idx = 0; state_idx < DFA_STATE_NUM; ++state_idx) {
+          if (bs[state_idx]) {
+            u32 dst_idx;
+            if (auto it = std::get<1>(dfa.nodes[state_idx]).find(a);
+                it != std::get<1>(dfa.nodes[state_idx]).end()) {
+              dst_idx = it->second;
+            } else {
+              dst_idx = DEAD_STATE_IDX;
+            }
+            map[dst_idx].insert(state_idx);
+            dst_bs.set(dst_idx);
+            dst_set.insert(dst_idx);
+          }
+        }
+
+        std::unordered_map<bitset, bitset> new_group_map;
+        for (auto& group : partition) {
+          for (auto dst_idx : dst_set) {
+            if (group[dst_idx]) {
+              for (auto state_idx : map[dst_idx]) {
+                new_group_map[group].set(state_idx);
+              }
+            }
+          }
+        }
+
+        if (new_group_map.size() > 1) {
+          changed = true;
+          new_partition.erase(bs);
+          for (auto& [_, new_group] : new_group_map) {
+            new_partition.insert(new_group);
+          }
+
+          break;
+        }
+      }
+    }
+    if (!changed) break;
+
+    assert(partition != new_partition);
+    assert(partition.size() < new_partition.size());
+    partition = new_partition;
+  }
+
+  // build new dfa
+  std::vector<bitset> final_partition;
+  final_partition.reserve(partition.size());
+  for (auto it = partition.begin(); it != partition.end();) {
+    final_partition.push_back(std::move(partition.extract(it++).value()));
+  }
+  std::unordered_map<u32, u32> state_to_group_idx;
+  for (u32 group_idx = 0; group_idx < (u32)final_partition.size();
+       ++group_idx) {
+    for (u32 state_idx = 0; state_idx < DFA_STATE_NUM + 1; ++state_idx) {
+      if (final_partition[group_idx][state_idx]) {
+        state_to_group_idx[state_idx] = group_idx;
+      }
+    }
+  }
+  std::vector<std::unordered_map<u8, u32>> next_vec(final_partition.size());
+  std::vector<std::optional<u32>> terminal_vec(final_partition.size());
+  // start node is always 0
+  constexpr u32 START_NODE_IDX = 0;
+  bool start_has_been_set = false;
+
+  u32 cur_start_group_idx;
+  for (u32 group_idx = 0; group_idx < (u32)final_partition.size();
+       ++group_idx) {
+    auto& group = final_partition[group_idx];
+    if (group[START_NODE_IDX]) {
+      assert(!start_has_been_set);
+      cur_start_group_idx = group_idx;
+      start_has_been_set = true;
+    }
+    for (u32 state_idx = 0; state_idx < DFA_STATE_NUM + 1; ++state_idx) {
+      if (group[state_idx]) {
+        if (state_idx != DEAD_STATE_IDX) {
+          auto terminal = std::get<0>(dfa.nodes[state_idx]);
+          if (terminal) {
+            if (terminal_vec[group_idx]) {
+              assert(terminal_vec[group_idx] == terminal);
+            }
+            terminal_vec[group_idx] = terminal;
+          } else {
+            assert(!terminal_vec[group_idx]);
+          }
+        }
+        for (int a = 0; a < 256; ++a) {
+          u32 dst_idx;
+          if (state_idx == DEAD_STATE_IDX)
+            dst_idx = DEAD_STATE_IDX;
+          else {
+            if (auto it = std::get<1>(dfa.nodes[state_idx]).find(a);
+                it != std::get<1>(dfa.nodes[state_idx]).end()) {
+              dst_idx = it->second;
+            } else {
+              dst_idx = DEAD_STATE_IDX;
+            }
+          }
+
+          auto dst_group_idx = state_to_group_idx[dst_idx];
+          // group_idx ----- a ----> dst_group_idx
+          if (next_vec[group_idx].find(a) != next_vec[group_idx].end()) {
+            assert(next_vec[group_idx][a] == dst_group_idx);
+          }
+          next_vec[group_idx][a] = dst_group_idx;
+        }
+
+        // only do it once
+        // break;
+      }
+    }
+  }
+
+  std::vector<DfaNode> nodes;
+  if (cur_start_group_idx == START_NODE_IDX) {
+    // just move
+    for (size_t i = 0; i < final_partition.size(); ++i) {
+      nodes.emplace_back(std::move(terminal_vec[i]), std::move(next_vec[i]));
+    }
+  } else {
+    // swap 0 with cur_start_group_idx
+    // 0 -> cur_start_group_idx
+    // cur_start_group_idx -> 0
+    for (size_t i = START_NODE_IDX; i < final_partition.size(); ++i) {
+      auto& next = next_vec[i];
+      for (auto& [k, v] : next) {
+        if (v == START_NODE_IDX)
+          v = cur_start_group_idx;
+        else if (v == cur_start_group_idx)
+          v = START_NODE_IDX;
+      }
+    }
+
+    for (size_t i = 0; i < final_partition.size(); ++i) {
+      if (i == START_NODE_IDX) {
+        nodes.emplace_back(std::move(terminal_vec[cur_start_group_idx]),
+                           std::move(next_vec[cur_start_group_idx]));
+      } else if (i == cur_start_group_idx) {
+        nodes.emplace_back(std::move(terminal_vec[START_NODE_IDX]),
+                           std::move(next_vec[START_NODE_IDX]));
+      } else {
+        nodes.emplace_back(std::move(terminal_vec[i]), std::move(next_vec[i]));
+      }
+    }
+  }
+
+  dfa.nodes = std::move(nodes);
+}
+
 void Dfa::minimize() {
-  // now only remove dead state
+  // to make sure no dead state
+  this->remove_dead_state();
+  // TODO: more efficiency
+#define CHECK_SIZE_BEFORE_WORK(N) \
+  if (this->nodes.size() <= N) {  \
+    minimize_impl<N>(*this);      \
+    this->remove_dead_state();    \
+    return;                       \
+  }
+
+  CHECK_SIZE_BEFORE_WORK(15);
+  CHECK_SIZE_BEFORE_WORK(31);
+  CHECK_SIZE_BEFORE_WORK(63);
+  CHECK_SIZE_BEFORE_WORK(127);
+  CHECK_SIZE_BEFORE_WORK(255);
+  CHECK_SIZE_BEFORE_WORK(511);
+  CHECK_SIZE_BEFORE_WORK(1023);
+
+  ERR_EXIT(this->nodes.size(), "minimize needs dfa.nodes.size() <= 1024");
+
+#undef CHECK_SIZE_BEFORE_WORK
+}
+
+void Dfa::remove_dead_state() {
+  // remove dead state
   // TODO: more efficient
   std::unordered_map<u32, u32> reindex;
 
@@ -226,7 +442,7 @@ Dfa Dfa::from_re(std::unique_ptr<re::Re>&& re, u32 id) {
 
 Dfa Dfa::from_sv(std::string_view sv, u32 id) {
   auto re = re::Re::parse(sv);
-  return from_re(std::move(re));
+  return from_re(std::move(re), id);
 }
 
 // "Compilers: Principles, Techniques and Tools" Algorithm 3.20
@@ -234,13 +450,6 @@ Dfa Dfa::from_sv(std::string_view sv, u32 id) {
 template <int NFA_STATE_NUM>
 static Dfa from_nfa_impl(nfa::Nfa&& nfa) {
   using bitset = std::bitset<NFA_STATE_NUM>;
-  auto e_closure_s = [&nfa](u32 state_idx) {
-    bitset bs;
-    bs.set(state_idx);
-    for (auto idx : nfa.nodes[state_idx].eps_edges) bs.set(idx);
-    return bs;
-  };
-
   auto e_closure = [&nfa](const bitset& T) {
     bitset bs = T;
     std::vector<u32> stack;
@@ -297,7 +506,9 @@ static Dfa from_nfa_impl(nfa::Nfa&& nfa) {
   std::unordered_map<bitset, u32> id_link;
 
   // start_node
-  bitset start_node = e_closure_s(0);
+  bitset init_node;
+  init_node.set(0);
+  bitset start_node = e_closure(init_node);
   unmarked_dfa_state.push_back(start_node);
   u32 cur_id = 0;
   id_link[start_node] = cur_id++;
@@ -349,6 +560,6 @@ Dfa Dfa::from_nfa(nfa::Nfa&& nfa) {
 
   ERR_EXIT(nfa.nodes.size(), "from_nfa needs nfa.nodes.size() <= 1024");
 
-#undef CHECK_SIZE
+#undef CHECK_SIZE_BEFORE_WORK
 }
 }  // namespace parsergen::dfa

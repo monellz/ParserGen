@@ -40,6 +40,7 @@ struct Dfa {
     return terminal;
   }
 
+  void remove_dead_state();
   void minimize();
 
   static Dfa from_sv(std::string_view sv, u32 id = 0);
