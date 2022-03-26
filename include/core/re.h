@@ -37,6 +37,11 @@ class Re {
   explicit Re(ReKind kind) : kind(kind) {}
   std::unique_ptr<Re> clone() const;
   virtual ~Re() {}
+
+  static std::unique_ptr<Re> parse_without_pipe(std::string_view sv);
+  static std::unique_ptr<Re> parse_brackets(std::string_view sv);
+  static std::unordered_set<char> _expand_metachar(std::string_view sv);
+  static std::unique_ptr<Re> parse(std::string_view sv);
 };
 
 class Eps : public Re {
@@ -104,21 +109,6 @@ class Disjunction : public Re {
     return new_dis;
   }
   virtual ~Disjunction() override {}
-};
-
-class ReEngine {
- public:
-  ReEngine() {}
-  static std::unique_ptr<Re> produce(std::string_view sv) {
-    ReEngine engine;
-    return engine.parse(sv);
-  }
-
-  std::unique_ptr<Re> parse(std::string_view sv);
-  std::unique_ptr<Re> parse_without_pipe(std::string_view sv);
-  std::unique_ptr<Re> parse_brackets(std::string_view sv);
-
-  std::unordered_set<char> _expand_metachar(std::string_view sv);
 };
 
 void dfs(std::unique_ptr<Re>& re,

@@ -36,8 +36,8 @@ struct Nfa {
   Nfa(const Nfa& d) : nodes(d.nodes) {}
   Nfa(Nfa&& d) : nodes(std::move(d.nodes)) {}
 
-  static Nfa from_re(std::unique_ptr<re::Re>& re, u32 id = 0);
-  static Nfa from_re(std::vector<std::unique_ptr<re::Re>>& res);
+  static Nfa from_re(std::unique_ptr<re::Re>&& re, u32 id = 0);
+  static Nfa from_re(std::vector<std::unique_ptr<re::Re>>&& res);
 };
 
 }  // namespace parsergen::nfa

@@ -27,7 +27,7 @@ std::unique_ptr<Re> Re::clone() const {
   return new_re;
 }
 
-std::unordered_set<char> ReEngine::_expand_metachar(std::string_view sv) {
+std::unordered_set<char> Re::_expand_metachar(std::string_view sv) {
   assert(sv[0] == '\\');
   assert(sv.size() == 2);
   std::unordered_set<char> hs;
@@ -86,7 +86,7 @@ std::unordered_set<char> ReEngine::_expand_metachar(std::string_view sv) {
   return hs;
 }
 
-std::unique_ptr<Re> ReEngine::parse_brackets(std::string_view sv) {
+std::unique_ptr<Re> Re::parse_brackets(std::string_view sv) {
   // []
   std::string_view original_sv = sv;
 
@@ -153,7 +153,7 @@ std::unique_ptr<Re> ReEngine::parse_brackets(std::string_view sv) {
   return final_dis;
 }
 
-std::unique_ptr<Re> ReEngine::parse_without_pipe(std::string_view sv) {
+std::unique_ptr<Re> Re::parse_without_pipe(std::string_view sv) {
   // meta char
   // ()[].|*+\?     use \ to escape metachar
   // we do not support {} ^ $
@@ -270,7 +270,7 @@ std::unique_ptr<Re> ReEngine::parse_without_pipe(std::string_view sv) {
   return concat;
 }
 
-std::unique_ptr<Re> ReEngine::parse(std::string_view sv) {
+std::unique_ptr<Re> Re::parse(std::string_view sv) {
   std::vector<std::string_view> output = split(sv, "|");
   if (output.size() == 1) return parse_without_pipe(output[0]);
 

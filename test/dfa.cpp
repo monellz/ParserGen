@@ -32,13 +32,13 @@ TEST(map, auto_init) {
 }
 
 TEST(basic, single_char) {
-  auto [_, char_dfa] = DfaEngine::produce("a");
+  auto char_dfa = Dfa::from_sv("a");
   EXPECT_TRUE(char_dfa.accept("a"));
   EXPECT_FALSE(char_dfa.accept("b"));
   EXPECT_FALSE(char_dfa.accept("1"));
   EXPECT_FALSE(char_dfa.accept("\n"));
   EXPECT_FALSE(char_dfa.accept(" "));
-  auto [__, num_dfa] = DfaEngine::produce("9");
+  auto num_dfa = Dfa::from_sv("9");
   EXPECT_TRUE(num_dfa.accept("9"));
   EXPECT_FALSE(num_dfa.accept("1"));
   EXPECT_FALSE(num_dfa.accept("b"));
@@ -47,26 +47,26 @@ TEST(basic, single_char) {
 }
 
 TEST(basic, metachar) {
-  auto [_, meta_dfa] = DfaEngine::produce(R"(\n)");
+  auto meta_dfa = Dfa::from_sv(R"(\n)");
   EXPECT_TRUE(meta_dfa.accept("\n"));
   EXPECT_FALSE(meta_dfa.accept("\b"));
   EXPECT_FALSE(meta_dfa.accept("\\"));
-  auto [__, plus_dfa] = DfaEngine::produce(R"(\+)");
+  auto plus_dfa = Dfa::from_sv(R"(\+)");
   EXPECT_TRUE(plus_dfa.accept("+"));
-  auto [___, dfa] = DfaEngine::produce(R"(a+)");
+  auto dfa = Dfa::from_sv(R"(a+)");
   EXPECT_TRUE(dfa.accept("a"));
   EXPECT_TRUE(dfa.accept("aa"));
   EXPECT_TRUE(dfa.accept("aaa"));
 }
 
 TEST(number, integer) {
-  auto [_, single_dfa] = DfaEngine::produce(R"([0-9])");
+  auto single_dfa = Dfa::from_sv(R"([0-9])");
   for (int i = 0; i <= 9; ++i) {
     EXPECT_TRUE(single_dfa.accept(std::to_string(i)));
   }
   EXPECT_FALSE(single_dfa.accept("asdadasd"));
 
-  auto [__, int_dfa] = DfaEngine::produce(R"([1-9][0-9]*)");
+  auto int_dfa = Dfa::from_sv(R"([1-9][0-9]*)");
   for (int i = 0; i < 1000; ++i) {
     int num = rand();
     ASSERT_TRUE(int_dfa.accept(std::to_string(num))) << num;
@@ -75,8 +75,7 @@ TEST(number, integer) {
 }
 
 TEST(number, floating) {
-  auto [_, float_dfa] =
-      DfaEngine::produce(R"([-+]?[0-9]*[.][0-9]*([eE][-+]?[0-9]+)?)");
+  auto float_dfa = Dfa::from_sv(R"([-+]?[0-9]*[.][0-9]*([eE][-+]?[0-9]+)?)");
   EXPECT_TRUE(float_dfa.accept("1.123120220"));
   EXPECT_TRUE(float_dfa.accept("-0.0220"));
   EXPECT_TRUE(float_dfa.accept("-0.0"));
@@ -97,13 +96,13 @@ TEST(number, floating) {
 }
 
 TEST(real_case, const_integer) {
-  auto [_, dfa] = DfaEngine::produce(R"(\d+|(0x[0-9a-fA-F]+))");
+  auto dfa = Dfa::from_sv(R"(\d+|(0x[0-9a-fA-F]+))");
   EXPECT_TRUE(dfa.accept("0x123123"));
   EXPECT_TRUE(dfa.accept("123123"));
 }
 
 TEST(real_case, ident) {
-  auto [_, dfa] = DfaEngine::produce(R"([_A-Za-z]\w*)");
+  auto dfa = Dfa::from_sv(R"([_A-Za-z]\w*)");
   EXPECT_TRUE(dfa.accept("_"));
   EXPECT_TRUE(dfa.accept("asdasdasd"));
   EXPECT_TRUE(dfa.accept("number"));

@@ -3,7 +3,7 @@
 namespace parsergen::nfa {
 
 // "Compilers: Principles, Techniques and Tools" Algorithm 3.23
-static Nfa from_re(std::unique_ptr<re::Re>& re, u32 id = 0) {
+Nfa Nfa::from_re(std::unique_ptr<re::Re>&& re, u32 id) {
   // TODO: more efficiency
   std::unordered_map<re::Re*, std::vector<NfaNode>> dfa_sons;
   re::dfs(re, [&](std::unique_ptr<re::Re>& _re) {
@@ -132,14 +132,14 @@ static Nfa from_re(std::unique_ptr<re::Re>& re, u32 id = 0) {
   return Nfa(std::move(dfa_sons[re.get()]));
 }
 
-static Nfa from_re(std::vector<std::unique_ptr<re::Re>>& res) {
+Nfa Nfa::from_re(std::vector<std::unique_ptr<re::Re>>&& res) {
   // merge these nfa
   std::vector<NfaNode> nodes;
   nodes.emplace_back(std::nullopt, std::vector<u32>(),
                      std::unordered_map<u8, std::vector<u32>>());
   u32 start_offset = 1;
   for (u32 id = 0; id < (u32)res.size(); ++id) {
-    auto nfa = std::move(from_re(res[id], id));
+    auto nfa = from_re(std::move(res[id]), id);
     nodes[0].eps_edges.push_back(start_offset);
     u32 nfa_node_size = nfa.nodes.size();
     for (auto& son_node : nfa.nodes) {

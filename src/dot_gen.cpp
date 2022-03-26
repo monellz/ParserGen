@@ -15,41 +15,12 @@ using namespace parsergen;
  *
  */
 
-std::string dot_from_re(std::unique_ptr<re::Re> regex, bool verbose) {
+std::string dot_from_re(std::unique_ptr<re::Re> regex) {
   std::ostringstream out;
   out << "digraph g{\n";
 
-  std::unordered_map<int, u8> leafpos_map;
-  std::unordered_map<int, std::unordered_set<int>> followpos;
-
-  auto re = regex.get();
-  dfa::DfaEngine dfa(std::move(regex));
-
   std::vector<re::Re*> stack;
-  std::function<std::string(const std::unordered_set<int>&)> set_to_string =
-      [](const std::unordered_set<int>& s) {
-        std::string o = "{";
-        std::set<int> new_s(s.begin(), s.end());
-        for (auto i : new_s) o += std::to_string(i) + ",";
-        if (!new_s.empty()) o.pop_back();
-        o += "}";
-        return o;
-      };
-
-  std::function<std::string(re::Re*, const std::unordered_set<int>&)>
-      to_string = [&](re::Re* r, const std::unordered_set<int>& fp) {
-        std::string label;
-        label +=
-            std::string("nullable: ") + (r->nullable ? "true" : "false") + "\n";
-        label += std::string("firstpos: ") + set_to_string(r->firstpos) + "\n";
-        label += std::string("lastpos: ") + set_to_string(r->lastpos) + "\n";
-        if (auto c = dyn_cast<re::Char>(r)) {
-          label += std::string("pos: ") + std::to_string(c->leaf_idx) + "\n";
-          label += std::string("followpos: ") + set_to_string(fp) + "\n";
-        }
-        return label;
-      };
-
+  auto re = regex.get();
   stack.push_back(re);
   std::unordered_map<re::Re*, int> idx_map;
   int idx = 0;
@@ -58,26 +29,14 @@ std::string dot_from_re(std::unique_ptr<re::Re> regex, bool verbose) {
     auto top = stack.back();
     auto top_idx = idx_map.at(top);
     stack.pop_back();
-    if (auto c = dyn_cast<re::Eps>(top)) {
+    if (dyn_cast<re::Eps>(top)) {
       std::string label = "Eps";
-      if (verbose) {
-        label += "\n";
-        label += to_string(c, {});
-      }
       out << top_idx << " [ shape = circle, label = \"" << label << "\" ]\n";
     } else if (auto c = dyn_cast<re::Char>(top)) {
       std::string label = std::string("Char: ") + c->c;
-      if (verbose) {
-        label += "\n";
-        label += to_string(c, followpos[c->leaf_idx]);
-      }
       out << top_idx << " [ shape = circle, label = \"" << label << "\"]\n";
     } else if (auto c = dyn_cast<re::Kleene>(top)) {
       std::string label = "Kleene";
-      if (verbose) {
-        label += "\n";
-        label += to_string(c, {});
-      }
       out << top_idx << " [ shape = circle, label = \"" << label << "\" ]\n";
       assert(idx_map.find(c->son.get()) == idx_map.end());
       idx_map[c->son.get()] = idx++;
@@ -85,10 +44,6 @@ std::string dot_from_re(std::unique_ptr<re::Re> regex, bool verbose) {
       out << top_idx << " -> " << idx_map.at(c->son.get()) << "\n";
     } else if (auto c = dyn_cast<re::Concat>(top)) {
       std::string label = "Concat";
-      if (verbose) {
-        label += "\n";
-        label += to_string(c, {});
-      }
       out << top_idx << " [ shape = circle, label = \"" << label << "\" ]\n";
       for (auto& son : c->sons) {
         assert(idx_map.find(son.get()) == idx_map.end());
@@ -98,10 +53,6 @@ std::string dot_from_re(std::unique_ptr<re::Re> regex, bool verbose) {
       }
     } else if (auto c = dyn_cast<re::Disjunction>(top)) {
       std::string label = "Disjunction";
-      if (verbose) {
-        label += "\n";
-        label += to_string(c, {});
-      }
       out << top_idx << " [ shape = circle, label = \"" << label << "\" ]\n";
       for (auto& son : c->sons) {
         assert(idx_map.find(son.get()) == idx_map.end());
@@ -113,8 +64,6 @@ std::string dot_from_re(std::unique_ptr<re::Re> regex, bool verbose) {
   }
 
   out << "}\n";
-  delete re;
-
   return out.str();
 }
 
@@ -205,11 +154,6 @@ int main(int argc, char* argv[]) {
       .required()
       .help("regex with double quotes");
 
-  parser.add_argument("-v", "--verbose")
-      .help("increase output verbosity")
-      .default_value(false)
-      .implicit_value(true);
-
   parser.add_argument("-t", "--type")
       .help("generate type [ast, dfa, nfa] default: dfa")
       .default_value(std::string{"dfa"})
@@ -234,20 +178,20 @@ int main(int argc, char* argv[]) {
 
   auto regex = parser.get<std::string>("--regex");
   auto type = parser.get<std::string>("--type");
-  auto verbose = parser["--verbose"] == true;
 
   std::string result;
 
   if (type == "nfa") {
-    auto re = re::ReEngine::produce(regex);
-    auto nfa = nfa::Nfa::from_re(re);
+    auto re = re::Re::parse(regex);
+    auto nfa = nfa::Nfa::from_re(std::move(re));
     result = dot_from_nfa(nfa);
   } else if (type == "dfa") {
-    auto [_, dfa] = dfa::DfaEngine::produce(regex);
+    auto re = re::Re::parse(regex);
+    auto dfa = dfa::Dfa::from_re(std::move(re));
     result = dot_from_dfa(dfa);
   } else if (type == "ast") {
-    auto re = re::ReEngine::produce(regex);
-    result = dot_from_re(std::move(re), verbose);
+    auto re = re::Re::parse(regex);
+    result = dot_from_re(std::move(re));
   }
 
   if (auto output_file = parser.present("--output")) {

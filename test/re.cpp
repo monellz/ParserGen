@@ -18,7 +18,7 @@ TEST(basic, single_word_char) {
   for (char c = '0'; c != '9'; ++c) words.insert(std::string(1, c));
 
   for (auto c : words) {
-    auto ptr = ReEngine::produce(c);
+    auto ptr = Re::parse(c);
     EXPECT_TRUE(isa<Concat>(ptr));
     auto concat = static_cast<Concat*>(ptr.get());
     EXPECT_TRUE(isa<Char>(concat->sons[0]));
@@ -28,15 +28,15 @@ TEST(basic, single_word_char) {
 }
 
 TEST(basic, metachar) {
-  EXPECT_NO_THROW({ auto _ = ReEngine::produce(R"(\w)"); });
-  EXPECT_NO_THROW({ auto _ = ReEngine::produce(R"(\s)"); });
-  EXPECT_NO_THROW({ auto _ = ReEngine::produce(R"(\n)"); });
-  EXPECT_NO_THROW({ auto _ = ReEngine::produce(R"(a|b)"); });
-  EXPECT_NO_THROW({ auto _ = ReEngine::produce(R"(\[\])"); });
+  EXPECT_NO_THROW({ auto _ = Re::parse(R"(\w)"); });
+  EXPECT_NO_THROW({ auto _ = Re::parse(R"(\s)"); });
+  EXPECT_NO_THROW({ auto _ = Re::parse(R"(\n)"); });
+  EXPECT_NO_THROW({ auto _ = Re::parse(R"(a|b)"); });
+  EXPECT_NO_THROW({ auto _ = Re::parse(R"(\[\])"); });
 }
 
 TEST(basic, real_case) {
-  EXPECT_NO_THROW({ auto _ = ReEngine::produce(R"([abc])"); });
-  EXPECT_NO_THROW({ auto _ = ReEngine::produce(R"([^abc])"); });
-  EXPECT_NO_THROW({ auto _ = ReEngine::produce(R"([\w])"); });
+  EXPECT_NO_THROW({ auto _ = Re::parse(R"([abc])"); });
+  EXPECT_NO_THROW({ auto _ = Re::parse(R"([^abc])"); });
+  EXPECT_NO_THROW({ auto _ = Re::parse(R"([\w])"); });
 }
