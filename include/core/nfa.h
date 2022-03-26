@@ -37,7 +37,7 @@ struct Nfa {
   Nfa(Nfa&& d) : nodes(std::move(d.nodes)) {}
 
   static Nfa from_sv(std::string_view sv, u32 id = 0);
-  static Nfa from_re(std::unique_ptr<re::Re>&& re, u32 id = 0);
+  static Nfa from_re(std::unique_ptr<re::Re> re, u32 id = 0);
   static Nfa from_re(std::vector<std::unique_ptr<re::Re>>&& res);
 };
 

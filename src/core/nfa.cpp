@@ -8,7 +8,7 @@ Nfa Nfa::from_sv(std::string_view sv, u32 id) {
 }
 
 // "Compilers: Principles, Techniques and Tools" Algorithm 3.23
-Nfa Nfa::from_re(std::unique_ptr<re::Re>&& re, u32 id) {
+Nfa Nfa::from_re(std::unique_ptr<re::Re> re, u32 id) {
   // TODO: more efficiency
   std::unordered_map<re::Re*, std::vector<NfaNode>> dfa_sons;
   re::dfs(re, [&](std::unique_ptr<re::Re>& _re) {

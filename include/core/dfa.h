@@ -44,7 +44,7 @@ struct Dfa {
   void minimize();
 
   static Dfa from_sv(std::string_view sv, u32 id = 0);
-  static Dfa from_re(std::unique_ptr<re::Re>&& re, u32 id = 0);
+  static Dfa from_re(std::unique_ptr<re::Re> re, u32 id = 0);
   static Dfa from_nfa(nfa::Nfa&& nfa);
 };
 

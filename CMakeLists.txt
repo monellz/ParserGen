@@ -4,7 +4,7 @@ set(project_name re2dfa)
 project(${project_name} CXX)
 set(CMAKE_CXX_STANDARD 17)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -Wall -Wno-missing-braces")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -Werror -Wall -Wno-missing-braces")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=leak -g")
 if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

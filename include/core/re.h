@@ -12,8 +12,6 @@
 
 namespace parsergen::re {
 
-using intset_t = std::unordered_set<int>;
-
 class Eps;
 class Char;
 class Kleene;
@@ -31,9 +29,6 @@ class Re {
   };
 
   ReKind kind;
-  bool nullable;
-  intset_t firstpos;
-  intset_t lastpos;
   explicit Re(ReKind kind) : kind(kind) {}
   std::unique_ptr<Re> clone() const;
   virtual ~Re() {}
@@ -55,7 +50,6 @@ class Eps : public Re {
 class Char : public Re {
  public:
   char c;
-  int leaf_idx;
   explicit Char(char c) : Re(ReKind::kChar), c(c) {}
   static bool classof(const Re* base) { return base->kind == ReKind::kChar; }
   std::unique_ptr<Char> clone_impl() const { return std::make_unique<Char>(c); }
