@@ -32,7 +32,7 @@ struct NfaNode {
 struct Nfa {
   // nodes[0] is the start
   std::vector<NfaNode> nodes;
-  explicit Nfa(std::vector<NfaNode> nodes) : nodes(std::move(nodes)) {}
+  explicit Nfa(std::vector<NfaNode>&& nodes) : nodes(std::move(nodes)) {}
   Nfa(const Nfa& d) : nodes(d.nodes) {}
   Nfa(Nfa&& d) : nodes(std::move(d.nodes)) {}
 

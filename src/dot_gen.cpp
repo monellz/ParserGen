@@ -187,7 +187,9 @@ int main(int argc, char* argv[]) {
     result = dot_from_nfa(nfa);
   } else if (type == "dfa") {
     auto re = re::Re::parse(regex);
-    auto dfa = dfa::Dfa::from_re(std::move(re));
+    // auto dfa = dfa::Dfa::from_re(std::move(re));
+    auto nfa = nfa::Nfa::from_re(std::move(re));
+    auto dfa = dfa::Dfa::from_nfa(std::move(nfa));
     result = dot_from_dfa(dfa);
   } else if (type == "ast") {
     auto re = re::Re::parse(regex);
